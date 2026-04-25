@@ -1,0 +1,129 @@
+{
+  "category": "additional_business_threats",
+  "description": "Extended business, governance, and operational threat patterns not covered in the main threat catalog",
+  "governance_threats": [
+    {
+      "id": "gov_001",
+      "threat": "No Audit Trail for Data Modifications",
+      "detection_rule": "Dataset lacks metadata about source, modification date, or version",
+      "severity": "CRITICAL",
+      "impact": "Cannot prove data integrity for compliance audits (SOX, GDPR Art 30, HIPAA). Fines range from $10K to $20M.",
+      "recommended_actions": [
+        "Implement DataSoul audit logging for all transformations",
+        "Timestamp every modification with user/system attribution",
+        "Maintain before/after snapshots for regulatory evidence",
+        "Export audit trail as PDF attachment to cleaned datasets"
+      ],
+      "business_narrative": "This dataset has no modification audit trail. For regulated industries, this is a compliance risk. DataSoul automatically creates a complete audit trail documenting every transformation, who approved it, and why."
+    },
+    {
+      "id": "gov_002",
+      "threat": "Data Freshness Degradation",
+      "detection_rule": "Most recent timestamp in dataset is >30 days old for operational data, >90 days for strategic data",
+      "severity": "MEDIUM",
+      "impact": "Decisions based on stale data. Market conditions, customer behavior, and competitive dynamics may have shifted.",
+      "recommended_actions": [
+        "Verify data pipeline is operational",
+        "Add freshness indicator to all dashboards",
+        "Warn users before generating insights from stale data",
+        "Recommend minimum refresh cadence by data type"
+      ]
+    },
+    {
+      "id": "gov_003",
+      "threat": "Sensitive Column Names Detected",
+      "detection_rule": "Column names match sensitive patterns: salary, ssn, social_security, password, credit_card, health_condition, religion, ethnicity, sexual_orientation, disability, political_affiliation",
+      "severity": "CRITICAL",
+      "impact": "Presence of sensitive attributes may violate data minimization principles (GDPR Art 5), create bias in ML models, or expose the organization to discrimination claims.",
+      "recommended_actions": [
+        "Review if each sensitive column is necessary for the analysis purpose",
+        "Apply differential privacy or k-anonymity techniques",
+        "Check for proxy variables that could indirectly reveal sensitive attributes",
+        "Document the lawful basis for processing each sensitive field"
+      ]
+    }
+  ],
+  "operational_threats": [
+    {
+      "id": "ops_001",
+      "threat": "Missing Region/Geographic Mapping",
+      "detection_rule": "Dataset has geographic identifiers (city, state, zipcode, country) but no standardized region mapping",
+      "severity": "MEDIUM",
+      "impact": "Geographic analysis requires consistent region definitions. Without mapping, 'New York' could be in either 'Northeast' or 'Mid-Atlantic' depending on the business's region definitions.",
+      "recommended_actions": [
+        "Create standardized region mapping dictionary",
+        "Apply mapping to create 'region' column",
+        "Handle edge cases (US territories, international)",
+        "Validate against business's official region definitions"
+      ]
+    },
+    {
+      "id": "ops_002",
+      "threat": "Unreliable KPIs Due to Data Quality",
+      "detection_rule": "KPI source columns have >5% missing values or >2% duplicates",
+      "severity": "CRITICAL",
+      "impact": "KPI dashboards showing inaccurate numbers. Executive decisions based on inflated/deflated metrics. Board reports with incorrect data.",
+      "recommended_actions": [
+        "Add data quality confidence indicators next to each KPI",
+        "Calculate KPI range (min-max) accounting for data uncertainty",
+        "Halt KPI reporting until critical data quality issues are resolved",
+        "Create 'KPI reliability score' for each metric"
+      ],
+      "business_narrative": "⚠️ KPI Reliability Warning: {kpi_count} key metrics are computed from columns with data quality issues. Revenue may be overstated by {inflation_range}. Customer count may be inflated by {dup_pct}%. All KPIs should be treated as estimates until data quality issues are resolved."
+    },
+    {
+      "id": "ops_003",
+      "threat": "Timezone Inconsistency",
+      "detection_rule": "Datetime columns contain timestamps in multiple timezones or timezone is ambiguous",
+      "severity": "MEDIUM",
+      "impact": "Event ordering becomes incorrect. Duration calculations are wrong. Cross-regional analysis is unreliable.",
+      "recommended_actions": [
+        "Standardize all timestamps to UTC",
+        "Store original timezone as separate column",
+        "Verify event ordering after timezone normalization",
+        "Flag any events that change sequence after normalization"
+      ]
+    },
+    {
+      "id": "ops_004",
+      "threat": "Currency Mixing",
+      "detection_rule": "Financial column contains values in multiple currencies (detected via symbols or magnitude differences)",
+      "severity": "CRITICAL",
+      "impact": "Summing INR and USD values produces meaningless totals. $100 + ₹100 = nonsense.",
+      "recommended_actions": [
+        "Detect and tag currency for each record",
+        "Convert to base currency using historical exchange rates",
+        "Store original currency and conversion rate for auditability",
+        "Flag records where currency is ambiguous"
+      ]
+    }
+  ],
+  "data_drift_threats": [
+    {
+      "id": "drift_001",
+      "threat": "Distribution Shift Over Time",
+      "detection_rule": "Column statistics (mean, std, percentiles) differ significantly between time periods or data batches",
+      "severity": "MEDIUM",
+      "impact": "ML models trained on historical data may perform poorly on recent data. Business metrics may show false trends.",
+      "recommended_actions": [
+        "Compare column distributions between first half and second half of dataset",
+        "Run Kolmogorov-Smirnov test for distributional differences",
+        "Retrain ML models if significant drift detected",
+        "Alert business users that recent data differs from historical patterns"
+      ]
+    },
+    {
+      "id": "drift_002",
+      "threat": "Schema Drift",
+      "detection_rule": "Column names, types, or count don't match expected schema from previous data loads",
+      "severity": "HIGH",
+      "impact": "ETL pipelines break. Dashboard queries fail. Missing columns cause analysis gaps.",
+      "recommended_actions": [
+        "Compare current schema against baseline/expected schema",
+        "Flag new, missing, or type-changed columns",
+        "Verify with data engineering team before processing",
+        "Update pipeline to handle schema changes gracefully"
+      ]
+    }
+  ]
+}

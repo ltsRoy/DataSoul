@@ -1,0 +1,150 @@
+{
+  "category": "missing_values",
+  "description": "Strategies and decision trees for handling missing data in datasets",
+  "patterns": [
+    {
+      "id": "mv_001",
+      "name": "Numeric Column - Normal Distribution",
+      "condition": "Column is numeric AND distribution is approximately normal (skewness between -0.5 and 0.5)",
+      "missing_rate_threshold": "< 30%",
+      "recommended_strategy": "mean_imputation",
+      "confidence": 0.92,
+      "explanation": "Mean imputation preserves the central tendency when the distribution is symmetric. The mean and median are approximately equal, making mean a reliable estimator.",
+      "alternatives": ["median_imputation", "knn_imputation"],
+      "pitfalls": "Reduces variance. Should not be used if missing rate exceeds 30% as it distorts the distribution.",
+      "business_impact": "Filling with mean maintains aggregate statistics (totals, averages) used in financial reporting and KPI dashboards.",
+      "example": "Filled 47 missing values in 'monthly_revenue' with mean ($12,450) — distribution is normal (skewness: 0.12), preserving revenue aggregates for quarterly reporting."
+    },
+    {
+      "id": "mv_002",
+      "name": "Numeric Column - Right Skewed",
+      "condition": "Column is numeric AND distribution is right-skewed (skewness > 0.5)",
+      "missing_rate_threshold": "< 30%",
+      "recommended_strategy": "median_imputation",
+      "confidence": 0.95,
+      "explanation": "Median imputation is superior for right-skewed distributions because the mean is pulled upward by extreme values (outliers or high-earners). The median represents the typical value more accurately.",
+      "alternatives": ["knn_imputation", "regression_imputation"],
+      "pitfalls": "Mean imputation would systematically overestimate missing values. For salary data, this could inflate payroll projections.",
+      "business_impact": "Using mean on skewed salary data could inflate projected payroll costs by 15-25%. Median preserves the 'typical employee' value.",
+      "example": "Filled 234 missing salary values using median (₹62,400) rather than mean (₹78,200) — distribution is right-skewed with executive outliers pulling the mean up by 25%."
+    },
+    {
+      "id": "mv_003",
+      "name": "Numeric Column - Left Skewed",
+      "condition": "Column is numeric AND distribution is left-skewed (skewness < -0.5)",
+      "missing_rate_threshold": "< 30%",
+      "recommended_strategy": "median_imputation",
+      "confidence": 0.93,
+      "explanation": "Left-skewed distributions have the mean pulled downward by extreme low values. Median better represents the central mass of data.",
+      "alternatives": ["knn_imputation", "regression_imputation"],
+      "pitfalls": "Mean would underestimate typical values. For metrics like customer satisfaction scores, this underestimates actual performance.",
+      "business_impact": "Using mean on left-skewed satisfaction scores underreports actual customer satisfaction, potentially triggering unnecessary interventions.",
+      "example": "Filled 89 missing satisfaction scores using median (4.2) instead of mean (3.7) — left skew caused by a small cluster of very low outlier scores."
+    },
+    {
+      "id": "mv_004",
+      "name": "Categorical Column - Low Missing Rate",
+      "condition": "Column is categorical AND missing rate < 5%",
+      "missing_rate_threshold": "< 5%",
+      "recommended_strategy": "mode_imputation",
+      "confidence": 0.88,
+      "explanation": "Mode (most frequent value) imputation works well for categorical data with a dominant category and low missing rates. It preserves the existing distribution.",
+      "alternatives": ["constant_unknown", "predictive_imputation"],
+      "pitfalls": "Can over-represent the dominant category. Avoid if the mode frequency is below 40% (no clear dominant value).",
+      "business_impact": "Preserves category distribution for segmentation analysis and marketing decisions.",
+      "example": "Filled 23 missing 'region' values with mode ('East') — East region represents 45% of records, and only 2.3% of region data was missing."
+    },
+    {
+      "id": "mv_005",
+      "name": "Categorical Column - High Missing Rate",
+      "condition": "Column is categorical AND missing rate >= 5%",
+      "missing_rate_threshold": ">= 5%",
+      "recommended_strategy": "constant_unknown",
+      "confidence": 0.85,
+      "explanation": "When a significant portion of categorical data is missing, filling with mode would artificially inflate one category. Adding an 'Unknown' category preserves the truth that these values are genuinely missing.",
+      "alternatives": ["predictive_imputation", "drop_column"],
+      "pitfalls": "Creates a new category that may affect downstream analysis. Models may learn patterns from 'Unknown' that are artifacts, not real patterns.",
+      "business_impact": "Prevents false conclusions in customer segmentation. An 'Unknown' segment can be targeted for data collection campaigns.",
+      "example": "Filled 847 missing 'department' values with 'Unknown' (17% missing rate) — mode imputation would have falsely inflated 'Sales' department by 17%."
+    },
+    {
+      "id": "mv_006",
+      "name": "Critical ID Column - Any Missing",
+      "condition": "Column appears to be a primary identifier (contains 'id', 'key', 'code') AND has any missing values",
+      "missing_rate_threshold": "> 0%",
+      "recommended_strategy": "flag_for_review",
+      "confidence": 0.99,
+      "explanation": "Missing IDs indicate broken data pipelines or ingestion errors. These should NEVER be imputed — they require manual investigation or source system correction.",
+      "alternatives": ["drop_rows"],
+      "pitfalls": "Imputing IDs creates phantom records that can cascade errors through joins and aggregations.",
+      "business_impact": "CRITICAL: Missing customer IDs can cause duplicate billing, incorrect revenue attribution, and compliance violations.",
+      "example": "⚠️ CRITICAL: 12 records have missing 'customer_id' — these cannot be imputed. Flagged for manual review. Missing IDs may indicate failed API ingestion from CRM."
+    },
+    {
+      "id": "mv_007",
+      "name": "Time Series Column - Sequential Missing",
+      "condition": "Column is date/time or part of a time series AND missing values are sequential",
+      "missing_rate_threshold": "< 20%",
+      "recommended_strategy": "forward_fill",
+      "confidence": 0.87,
+      "explanation": "Forward fill (ffill) propagates the last known value forward in time, which is appropriate when the true value is likely unchanged (e.g., stock status, membership level).",
+      "alternatives": ["interpolation", "backward_fill"],
+      "pitfalls": "Not suitable for highly volatile metrics (e.g., stock prices). Can mask genuine changes.",
+      "business_impact": "Maintains temporal continuity in time-series dashboards and trend analysis.",
+      "example": "Forward-filled 34 missing 'subscription_status' values in sequential date range — status likely unchanged between observations."
+    },
+    {
+      "id": "mv_008",
+      "name": "Multivariate Missing - Correlated Columns",
+      "condition": "Multiple columns have missing values AND they are correlated (correlation > 0.5)",
+      "missing_rate_threshold": "5-30%",
+      "recommended_strategy": "mice_imputation",
+      "confidence": 0.90,
+      "explanation": "MICE (Multiple Imputation by Chained Equations) models each column with missing values as a function of other columns. When columns are correlated, MICE leverages these relationships for more accurate imputation.",
+      "alternatives": ["knn_imputation", "regression_imputation"],
+      "pitfalls": "Computationally expensive for large datasets. Requires sufficient non-missing data to learn relationships.",
+      "business_impact": "Preserves inter-variable relationships critical for predictive modeling and correlation-based business analysis.",
+      "example": "Applied MICE imputation to 'income', 'spending', and 'credit_score' — these 3 correlated columns (r > 0.65) benefit from multivariate imputation that preserves their relationships."
+    },
+    {
+      "id": "mv_009",
+      "name": "Sparse Column - Very High Missing Rate",
+      "condition": "Column has missing rate > 60%",
+      "missing_rate_threshold": "> 60%",
+      "recommended_strategy": "drop_column",
+      "confidence": 0.82,
+      "explanation": "Columns with >60% missing data provide more noise than signal. Any imputation method would be inventing data rather than estimating it. The column lacks sufficient information to be useful.",
+      "alternatives": ["flag_for_review", "create_indicator"],
+      "pitfalls": "Before dropping, check if the column is business-critical or if missingness itself is informative (e.g., 'referral_source' missing may indicate organic traffic).",
+      "business_impact": "Keeping highly sparse columns wastes computational resources and can introduce bias in ML models.",
+      "example": "Recommended dropping 'fax_number' column — 87% missing. In modern business data, fax numbers are rarely populated and add no analytical value."
+    },
+    {
+      "id": "mv_010",
+      "name": "Informative Missingness",
+      "condition": "The pattern of missingness correlates with the target variable or key outcomes",
+      "missing_rate_threshold": "any",
+      "recommended_strategy": "create_indicator",
+      "confidence": 0.91,
+      "explanation": "When data is Missing Not At Random (MNAR), the fact that it's missing IS information. Creating a binary indicator column (1=missing, 0=present) captures this pattern for ML models.",
+      "alternatives": ["mice_imputation", "domain_expert_review"],
+      "pitfalls": "Doubles the feature space. Should be combined with another imputation method for the actual values.",
+      "business_impact": "In healthcare, missing test results may indicate the test wasn't ordered — itself a diagnostic signal. In finance, missing income data may indicate informal employment.",
+      "example": "Created indicator column 'income_missing_flag' — missingness in income correlates with loan default (r=0.34), suggesting informative missingness (MNAR pattern)."
+    }
+  ],
+  "decision_tree": {
+    "description": "Follow this decision tree to select the optimal imputation strategy",
+    "steps": [
+      "1. Is the column an ID/key field? → Flag for manual review (NEVER impute IDs)",
+      "2. Is the missing rate > 60%? → Consider dropping the column",
+      "3. Is the missingness informative (correlated with target)? → Create missing indicator + impute",
+      "4. Is the column categorical? → If <5% missing: use mode. If >=5%: use 'Unknown' constant",
+      "5. Is the column numeric with normal distribution? → Use mean imputation",
+      "6. Is the column numeric with skewed distribution? → Use median imputation",
+      "7. Is the column part of a time series? → Use forward fill or interpolation",
+      "8. Are multiple correlated columns missing? → Use MICE imputation",
+      "9. Is the missing rate moderate (5-30%)? → Consider KNN or regression imputation"
+    ]
+  }
+}

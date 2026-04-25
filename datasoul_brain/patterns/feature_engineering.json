@@ -1,0 +1,110 @@
+{
+  "category": "feature_engineering_patterns",
+  "description": "Common feature engineering patterns and date/text decomposition strategies",
+  "date_decomposition": [
+    {
+      "id": "fe_date_001",
+      "name": "Date Column Decomposition",
+      "condition": "Column detected as date/datetime type",
+      "recommended_features": ["year", "month", "day", "day_of_week", "quarter", "is_weekend", "is_month_start", "is_month_end"],
+      "confidence": 0.91,
+      "explanation": "Raw dates are unusable by ML models. Decomposing into components captures seasonality, day-of-week effects, and trends.",
+      "business_impact": "Date decomposition reveals seasonal patterns (Q4 holiday spikes), day-of-week effects (Monday dips), and long-term trends invisible in raw date format.",
+      "example": "Decomposed 'order_date' into year, month, day_of_week, quarter, is_weekend — enabling seasonal analysis and day-of-week demand patterns."
+    },
+    {
+      "id": "fe_date_002",
+      "name": "Time Duration Features",
+      "condition": "Two date columns exist (start/end pattern detected)",
+      "recommended_features": ["duration_days", "duration_hours"],
+      "confidence": 0.88,
+      "explanation": "The difference between two dates often contains more predictive power than the dates themselves (e.g., length of stay, delivery time, tenure).",
+      "example": "Created 'tenure_days' from 'hire_date' to 'current_date' — tenure is a stronger predictor of attrition than raw hire date."
+    }
+  ],
+  "text_handling": [
+    {
+      "id": "fe_text_001",
+      "name": "Text Length Feature",
+      "condition": "Column contains free-text descriptions",
+      "recommended_features": ["text_length", "word_count"],
+      "confidence": 0.75,
+      "explanation": "Text length can be a useful feature (longer product descriptions may correlate with different sales patterns).",
+      "example": "Created 'description_length' from 'product_description' — longer descriptions correlate with 12% higher conversion rates."
+    },
+    {
+      "id": "fe_text_002",
+      "name": "Text Category Extraction",
+      "condition": "Column contains semi-structured text with extractable categories",
+      "recommended_features": ["extracted_category", "contains_keyword"],
+      "confidence": 0.70,
+      "explanation": "Extract structured features from semi-structured text using regex or keyword matching.",
+      "example": "Extracted 'has_discount_mention' from 'product_title' — products with 'sale' or 'discount' in title have 2.3× click rate."
+    }
+  ],
+  "numeric_combinations": [
+    {
+      "id": "fe_num_001",
+      "name": "Ratio Features",
+      "condition": "Two related numeric columns exist (e.g., revenue and quantity, or cost and price)",
+      "recommended_features": ["ratio", "per_unit_value"],
+      "confidence": 0.83,
+      "explanation": "Ratios normalize for scale and often reveal efficiency or profitability patterns invisible in raw values.",
+      "example": "Created 'revenue_per_unit' from 'total_revenue / quantity' — reveals pricing efficiency across product categories."
+    },
+    {
+      "id": "fe_num_002",
+      "name": "Binning / Discretization",
+      "condition": "Continuous numeric column with clear business-meaningful ranges",
+      "recommended_features": ["binned_category"],
+      "confidence": 0.78,
+      "explanation": "Converting continuous values to bins (Low/Medium/High or age groups) can reveal non-linear relationships and improve interpretability.",
+      "example": "Binned 'age' into groups (18-25, 26-35, 36-50, 51+) — reveals that the 26-35 age group has 40% higher purchase frequency."
+    }
+  ],
+  "aggregation_features": [
+    {
+      "id": "fe_agg_001",
+      "name": "Group-Level Statistics",
+      "condition": "Dataset has a natural grouping column (customer_id, department, region)",
+      "recommended_features": ["group_mean", "group_count", "group_std"],
+      "confidence": 0.80,
+      "explanation": "Rolling up individual records to group-level statistics captures entity behavior patterns (high-spending customers, high-performing departments).",
+      "example": "Created 'customer_avg_order_value' by grouping on 'customer_id' — this feature captures individual customer spending patterns."
+    }
+  ],
+  "column_dropping_rules": [
+    {
+      "id": "drop_001",
+      "name": "Constant Column",
+      "condition": "Column has only 1 unique value",
+      "action": "drop",
+      "confidence": 0.99,
+      "explanation": "A column with zero variance provides no information for analysis or modeling."
+    },
+    {
+      "id": "drop_002",
+      "name": "Near-Zero Variance",
+      "condition": "Column has < 0.1% unique value ratio",
+      "action": "review_then_drop",
+      "confidence": 0.85,
+      "explanation": "Near-constant columns add noise without signal. Verify the rare values aren't meaningful before dropping."
+    },
+    {
+      "id": "drop_003",
+      "name": "High Cardinality ID-like",
+      "condition": "Column has unique values equal to row count AND appears to be an identifier",
+      "action": "drop_for_ml",
+      "confidence": 0.92,
+      "explanation": "ID columns have no predictive power and cause models to memorize individual records (overfitting). Keep for reference but exclude from feature sets."
+    },
+    {
+      "id": "drop_004",
+      "name": "Highly Correlated Redundant",
+      "condition": "Two columns have correlation > 0.95",
+      "action": "drop_one",
+      "confidence": 0.88,
+      "explanation": "Near-perfect correlation means the columns carry the same information. Keep the more interpretable/complete one."
+    }
+  ]
+}

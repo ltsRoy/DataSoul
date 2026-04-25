@@ -1,0 +1,81 @@
+{
+  "category": "encoding_strategies",
+  "description": "Decision patterns for encoding categorical variables",
+  "patterns": [
+    {
+      "id": "enc_001",
+      "name": "Low Cardinality Nominal",
+      "condition": "Categorical column with <= 10 unique values AND no natural ordering",
+      "recommended_strategy": "one_hot_encoding",
+      "confidence": 0.94,
+      "explanation": "One-hot encoding creates binary columns for each category. Works best with low cardinality (≤10) to avoid dimensionality explosion. No ordering assumptions — pure nominal data.",
+      "pitfalls": "Creates N new columns. Watch for multicollinearity in linear models (use drop_first=True).",
+      "business_impact": "Preserves category independence. Essential for region, department, product_category analysis.",
+      "example": "Applied one-hot encoding to 'region' (5 unique values: North, South, East, West, Central) — low cardinality, no natural order."
+    },
+    {
+      "id": "enc_002",
+      "name": "High Cardinality Nominal",
+      "condition": "Categorical column with > 10 unique values AND no natural ordering",
+      "recommended_strategy": "frequency_encoding",
+      "confidence": 0.87,
+      "explanation": "Frequency encoding replaces each category with its count (or proportion) in the dataset. Avoids dimensionality explosion from one-hot encoding high cardinality features.",
+      "alternatives": ["target_encoding", "hash_encoding"],
+      "pitfalls": "Categories with similar frequencies become indistinguishable. Consider target encoding if a target variable is available.",
+      "business_impact": "High cardinality one-hot encoding creates sparse matrices that slow down model training and increase memory by 10-50×.",
+      "example": "Applied frequency encoding to 'zipcode' (2,847 unique values) — one-hot would create 2,847 new columns, causing memory issues."
+    },
+    {
+      "id": "enc_003",
+      "name": "Ordinal Categories",
+      "condition": "Categorical column with natural ordering (e.g., Low < Medium < High)",
+      "recommended_strategy": "ordinal_encoding",
+      "confidence": 0.96,
+      "explanation": "Ordinal encoding assigns integers respecting the natural order (Low=1, Medium=2, High=3). Preserves the meaningful ranking relationship.",
+      "pitfalls": "Assumes equal spacing between categories (Low→Medium = Medium→High). May need manual mapping definition.",
+      "business_impact": "Preserves ranking information critical for customer tier analysis, satisfaction scoring, and priority-based operations.",
+      "example": "Applied ordinal encoding to 'education_level': High School=1, Bachelor's=2, Master's=3, PhD=4 — natural academic progression."
+    },
+    {
+      "id": "enc_004",
+      "name": "Binary Categories",
+      "condition": "Categorical column with exactly 2 unique values",
+      "recommended_strategy": "label_encoding",
+      "confidence": 0.98,
+      "explanation": "Simple 0/1 encoding for binary features. No dimensionality increase, no ordering issues with just two values.",
+      "pitfalls": "Ensure consistent mapping (e.g., Yes=1, No=0). Document which value maps to which.",
+      "business_impact": "Clean binary representation for gender, yes/no, active/inactive features.",
+      "example": "Applied label encoding to 'is_active': Active=1, Inactive=0 — binary column, straightforward mapping."
+    },
+    {
+      "id": "enc_005",
+      "name": "Target Encoding (Supervised)",
+      "condition": "Categorical column with moderate-high cardinality AND target variable is available",
+      "recommended_strategy": "target_encoding",
+      "confidence": 0.84,
+      "explanation": "Replaces each category with the mean of the target variable for that category. Captures the relationship between the category and the outcome.",
+      "pitfalls": "HIGH RISK of target leakage. Must use proper cross-validation folds. Regularize with smoothing to prevent overfitting on rare categories.",
+      "business_impact": "Powerful for prediction tasks but dangerous without proper implementation. Can inflate model performance artificially.",
+      "example": "Applied smoothed target encoding to 'city' (156 unique values) with 5-fold cross-validation — mean target value per city captures geographic conversion patterns."
+    },
+    {
+      "id": "enc_006",
+      "name": "Text/Free-Form Categories",
+      "condition": "Column contains free-form text entries with many slight variations",
+      "recommended_strategy": "clean_then_encode",
+      "confidence": 0.80,
+      "explanation": "First standardize the text (lowercase, strip whitespace, fix typos), then group similar values, then apply appropriate encoding.",
+      "pitfalls": "Skipping cleaning leads to artificially inflated cardinality (e.g., 'New York', 'new york', 'NY', 'newyork' counted as 4 categories).",
+      "business_impact": "Uncleaned text categories fragment customer segments and product categories, reducing analysis accuracy by 20-40%.",
+      "example": "Standardized 'city' column: merged 'New York'/'new york'/'NYC'/'NY' into 'New York' — reduced cardinality from 234 to 89 unique values."
+    }
+  ],
+  "decision_tree": [
+    "1. Is the column binary (2 unique values)? → Label encoding (0/1)",
+    "2. Does the column have natural ordering? → Ordinal encoding",
+    "3. Is cardinality low (≤ 10)? → One-hot encoding",
+    "4. Is cardinality high (> 10) AND target available? → Target encoding (with CV regularization)",
+    "5. Is cardinality high (> 10) AND no target? → Frequency encoding",
+    "6. Does the column have text/free-form variations? → Clean first, then re-evaluate cardinality"
+  ]
+}

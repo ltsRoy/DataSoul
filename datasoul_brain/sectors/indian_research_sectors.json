@@ -1,0 +1,201 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "description": "Indian research & government sector intelligence for DataSoul",
+    "target_orgs": ["ISRO", "DRDO", "BARC", "IITs", "IISc", "IISERs", "ISI", "IIIT", "NIC", "NITI Aayog", "TCS Research", "Fractal", "Mu Sigma", "AI4Bharat", "Jio AI"]
+  },
+  "sectors": {
+    "space_isro": {
+      "name": "Space & Satellite (ISRO)",
+      "keywords": ["orbit", "satellite", "telemetry", "altitude", "azimuth", "inclination", "apogee", "perigee", "launch", "payload", "transponder", "sar", "remote_sensing", "ndvi", "reflectance", "spectral", "radiance", "swath"],
+      "data_patterns": {
+        "common_columns": ["timestamp", "latitude", "longitude", "altitude", "velocity", "temperature", "pressure", "signal_strength"],
+        "common_issues": ["sensor_drift", "telemetry_gaps", "coordinate_precision", "temporal_misalignment"],
+        "typical_formats": ["HDF5", "FITS", "CSV", "GeoTIFF", "NetCDF"]
+      },
+      "quality_focus": ["temporal_consistency", "coordinate_validation", "sensor_calibration", "missing_telemetry"],
+      "benchmarks": {
+        "acceptable_missing_rate": 2,
+        "coordinate_precision_digits": 6,
+        "temporal_gap_threshold_seconds": 60
+      },
+      "recommendations": [
+        "Validate coordinate ranges: Lat [-90,90], Lon [-180,180]",
+        "Check for telemetry gaps > 60s which may indicate communication loss",
+        "Verify sensor readings against calibration bounds",
+        "Flag altitude values outside expected orbital range"
+      ]
+    },
+    "defense_drdo": {
+      "name": "Defense & Strategic (DRDO)",
+      "keywords": ["radar", "signal", "frequency", "amplitude", "doppler", "target", "range_km", "bearing", "threat_level", "classification", "sensor_array", "trajectory"],
+      "data_patterns": {
+        "common_columns": ["timestamp", "sensor_id", "signal_strength", "frequency", "range", "bearing", "classification"],
+        "common_issues": ["classification_sensitivity", "sensor_fusion_conflicts", "temporal_precision", "noise_floor"],
+        "typical_formats": ["CSV", "JSON", "Binary", "HDF5"]
+      },
+      "quality_focus": ["data_classification_compliance", "sensor_fusion_consistency", "noise_detection", "temporal_precision"],
+      "benchmarks": {
+        "acceptable_missing_rate": 0.5,
+        "temporal_precision_ms": 10,
+        "duplicate_threshold": 0.01
+      },
+      "recommendations": [
+        "Ensure no classified data leakage in exported datasets",
+        "Validate sensor fusion: cross-check overlapping sensor readings",
+        "Remove noise floor artifacts before ML training",
+        "Check temporal ordering is strictly monotonic"
+      ]
+    },
+    "nuclear_barc": {
+      "name": "Nuclear & Energy (BARC)",
+      "keywords": ["radiation", "dosimeter", "neutron", "reactor", "isotope", "decay", "half_life", "contamination", "coolant", "criticality", "becquerel", "sievert", "gray"],
+      "data_patterns": {
+        "common_columns": ["timestamp", "sensor_id", "radiation_level", "temperature", "pressure", "flow_rate", "status"],
+        "common_issues": ["sensor_saturation", "calibration_drift", "threshold_violations", "data_classification"],
+        "typical_formats": ["CSV", "Excel", "SCADA"]
+      },
+      "quality_focus": ["threshold_compliance", "calibration_validity", "temporal_continuity", "safety_bounds"],
+      "benchmarks": {
+        "acceptable_missing_rate": 0.1,
+        "safety_threshold_check": true
+      },
+      "recommendations": [
+        "Flag any radiation readings above safety thresholds immediately",
+        "Verify sensor calibration dates are within validity period",
+        "Check for temporal gaps that may indicate sensor failure",
+        "Validate all readings are within physically possible ranges"
+      ]
+    },
+    "agriculture_india": {
+      "name": "Agriculture & Crop Science",
+      "keywords": ["crop", "yield", "kharif", "rabi", "msp", "soil", "irrigation", "rainfall", "hectare", "fertilizer", "pesticide", "apmc", "mandi", "procurement", "foodgrain", "paddy", "wheat", "cotton", "sugarcane"],
+      "data_patterns": {
+        "common_columns": ["state", "district", "crop", "season", "year", "area_hectares", "production_tonnes", "yield_kg_per_hectare", "rainfall_mm", "msp_rs"],
+        "common_issues": ["state_name_inconsistency", "unit_mismatch_hectare_acre", "seasonal_coding", "missing_district_data"],
+        "typical_formats": ["CSV", "Excel", "data.gov.in API"]
+      },
+      "quality_focus": ["geographic_consistency", "unit_standardization", "seasonal_validation", "yield_plausibility"],
+      "benchmarks": {
+        "yield_range_wheat_kg": [1500, 6000],
+        "yield_range_rice_kg": [1000, 5000],
+        "acceptable_missing_rate": 5
+      },
+      "recommendations": [
+        "Standardize state/district names to Census 2011 naming",
+        "Convert all area to hectares (1 acre = 0.4047 hectares)",
+        "Validate yield: wheat typically 1500-6000 kg/ha, rice 1000-5000 kg/ha",
+        "Check MSP values against government notifications",
+        "Flag Kharif data appearing in Rabi season and vice versa"
+      ]
+    },
+    "health_ayushman": {
+      "name": "Health & Public Health (Ayushman Bharat)",
+      "keywords": ["patient", "diagnosis", "icd", "hospital", "abha", "pmjay", "claim", "treatment", "discharge", "aadhaar", "beneficiary", "empanelment", "drg", "procedure"],
+      "data_patterns": {
+        "common_columns": ["patient_id", "abha_id", "hospital_id", "diagnosis_code", "admission_date", "discharge_date", "claim_amount", "status", "state", "district"],
+        "common_issues": ["pii_exposure", "icd_code_validation", "date_format_inconsistency", "claim_amount_outliers"],
+        "typical_formats": ["CSV", "Excel", "JSON", "HL7"]
+      },
+      "quality_focus": ["pii_detection", "medical_code_validation", "temporal_logic", "amount_plausibility"],
+      "benchmarks": {
+        "pii_columns_allowed": 0,
+        "date_format": "YYYY-MM-DD",
+        "claim_outlier_threshold_inr": 1000000
+      },
+      "recommendations": [
+        "CRITICAL: Check for PII (Aadhaar, phone, name) before sharing",
+        "Validate ICD-10 diagnosis codes against WHO codebook",
+        "Ensure discharge_date >= admission_date",
+        "Flag claims > ₹10L as potential outliers for review",
+        "Anonymize patient identifiers before ML training"
+      ]
+    },
+    "finance_upi": {
+      "name": "Finance & Digital Payments (UPI/NPCI)",
+      "keywords": ["upi", "transaction", "merchant", "payment", "settlement", "refund", "gstin", "pan", "invoice", "gst", "npci", "imps", "neft", "rtgs", "emi"],
+      "data_patterns": {
+        "common_columns": ["transaction_id", "timestamp", "amount", "merchant_id", "payment_mode", "status", "upi_id"],
+        "common_issues": ["duplicate_transactions", "settlement_mismatch", "timezone_inconsistency", "pii_in_merchant_data"],
+        "typical_formats": ["CSV", "JSON", "Excel"]
+      },
+      "quality_focus": ["transaction_uniqueness", "amount_validation", "temporal_consistency", "pii_scrubbing"],
+      "benchmarks": {
+        "duplicate_threshold": 0.001,
+        "max_single_upi_transaction_inr": 100000,
+        "settlement_match_rate": 99.5
+      },
+      "recommendations": [
+        "Deduplicate by transaction_id — UPI can send duplicate callbacks",
+        "Validate UPI transaction limit: max ₹1L per transaction (₹2L for certain categories)",
+        "Check timezone: all timestamps should be IST (UTC+5:30)",
+        "Remove PII: UPI IDs, phone numbers, names",
+        "Validate GST: GSTIN format is 2-digit state code + 10-char PAN + entity + checksum"
+      ]
+    },
+    "education_nep": {
+      "name": "Education & Research (NEP/UGC)",
+      "keywords": ["student", "enrollment", "nirf", "naac", "udise", "school", "university", "faculty", "research", "publication", "citation", "h_index", "semester", "grade", "cgpa", "placement"],
+      "data_patterns": {
+        "common_columns": ["institution_id", "institution_name", "state", "year", "enrollment", "faculty_count", "nirf_rank", "naac_grade", "placement_rate"],
+        "common_issues": ["institution_name_variants", "year_format_inconsistency", "metric_definition_changes", "missing_rural_data"],
+        "typical_formats": ["CSV", "Excel", "PDF tables"]
+      },
+      "quality_focus": ["institutional_identity_resolution", "temporal_comparability", "metric_standardization"],
+      "benchmarks": {
+        "nirf_rank_range": [1, 200],
+        "naac_grades": ["A++", "A+", "A", "B++", "B+", "B", "C"],
+        "acceptable_missing_rate": 10
+      },
+      "recommendations": [
+        "Standardize institution names (IIT Bombay vs IITB vs Indian Institute of Technology Bombay)",
+        "Validate NIRF ranks are within published range",
+        "Check NAAC grades against valid options: A++, A+, A, B++, B+, B, C",
+        "Flag enrollment numbers that change > 30% year-over-year as potential errors"
+      ]
+    },
+    "smart_cities": {
+      "name": "Smart Cities & Urban Data",
+      "keywords": ["aqi", "pollution", "traffic", "water", "waste", "iot", "sensor", "pm25", "pm10", "co2", "noise", "temperature", "humidity", "flow_rate", "occupancy"],
+      "data_patterns": {
+        "common_columns": ["sensor_id", "timestamp", "latitude", "longitude", "pm25", "pm10", "aqi", "temperature", "humidity"],
+        "common_issues": ["sensor_malfunction_spikes", "spatial_gaps", "timezone_mismatch", "iot_battery_dropout"],
+        "typical_formats": ["CSV", "JSON", "MQTT", "IoT APIs"]
+      },
+      "quality_focus": ["sensor_health", "spatial_coverage", "temporal_regularity", "anomaly_detection"],
+      "benchmarks": {
+        "pm25_range_ug_m3": [0, 500],
+        "temperature_range_c": [-10, 55],
+        "humidity_range_pct": [0, 100],
+        "sensor_uptime_pct": 95
+      },
+      "recommendations": [
+        "Flag PM2.5 readings > 500 µg/m³ as likely sensor malfunction",
+        "Check for sensor dropout patterns (battery/connectivity issues)",
+        "Validate coordinates fall within city municipal boundaries",
+        "Cross-reference AQI with CPCB standards for category assignment"
+      ]
+    },
+    "telecom_bharatnet": {
+      "name": "Telecom & Connectivity (BharatNet)",
+      "keywords": ["tower", "cell", "signal", "bandwidth", "latency", "throughput", "coverage", "spectrum", "5g", "fiber", "broadband", "subscriber", "churn", "arpu", "cdr"],
+      "data_patterns": {
+        "common_columns": ["tower_id", "latitude", "longitude", "technology", "bandwidth_mbps", "subscribers", "uptime_pct", "state", "district"],
+        "common_issues": ["coverage_gap_detection", "coordinate_accuracy", "technology_mismatch", "subscriber_count_spikes"],
+        "typical_formats": ["CSV", "JSON", "Excel"]
+      },
+      "quality_focus": ["geographic_accuracy", "capacity_plausibility", "temporal_trends", "coverage_completeness"],
+      "benchmarks": {
+        "min_uptime_pct": 99.5,
+        "bandwidth_5g_min_mbps": 100,
+        "arpu_range_inr": [50, 500]
+      },
+      "recommendations": [
+        "Validate tower coordinates against TRAI licensing data",
+        "Flag towers with < 99.5% uptime for review",
+        "Check subscriber counts for sudden spikes (data migration artifacts)",
+        "Verify ARPU values are within ₹50-500 range for Indian market"
+      ]
+    }
+  }
+}

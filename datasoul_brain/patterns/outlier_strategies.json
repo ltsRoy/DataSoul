@@ -1,0 +1,102 @@
+{
+  "category": "outlier_detection_and_treatment",
+  "description": "Strategies for detecting and handling outliers in datasets",
+  "detection_methods": [
+    {
+      "id": "od_001",
+      "name": "IQR Method (Tukey Fences)",
+      "formula": "Q1 - 1.5*IQR to Q3 + 1.5*IQR",
+      "best_for": "Skewed distributions, robust to extreme values",
+      "confidence": 0.90,
+      "explanation": "Uses the interquartile range to define boundaries. Values outside 1.5×IQR from Q1/Q3 are flagged. Robust because it's based on quartiles, not mean/std."
+    },
+    {
+      "id": "od_002",
+      "name": "Z-Score Method",
+      "formula": "|z| > 3 (value is 3+ standard deviations from mean)",
+      "best_for": "Normally distributed data",
+      "confidence": 0.85,
+      "explanation": "Assumes normal distribution. Values beyond 3 standard deviations from the mean are flagged. Not suitable for skewed data."
+    },
+    {
+      "id": "od_003",
+      "name": "Modified Z-Score (MAD)",
+      "formula": "0.6745 * (xi - median) / MAD > 3.5",
+      "best_for": "Robust alternative to Z-score, works with skewed data",
+      "confidence": 0.92,
+      "explanation": "Uses Median Absolute Deviation instead of standard deviation. More robust to the presence of outliers themselves."
+    }
+  ],
+  "treatment_patterns": [
+    {
+      "id": "ot_001",
+      "name": "Extreme Outliers in Revenue/Financial Data",
+      "condition": "Financial column with values > 5× median",
+      "recommended_strategy": "cap_winsorize",
+      "confidence": 0.88,
+      "explanation": "Winsorizing caps extreme values at a percentile (e.g., 1st and 99th). This preserves the record while reducing the outlier's influence on aggregates.",
+      "business_impact": "Uncapped revenue outliers can inflate average order value by 30-50%, misleading pricing and inventory decisions.",
+      "example": "Winsorized 23 revenue values exceeding $50,000 (99th percentile cap) — these outlier transactions inflated average order value from $245 to $890."
+    },
+    {
+      "id": "ot_002",
+      "name": "Outliers in Age/Demographic Data",
+      "condition": "Age column with values < 0 or > 120",
+      "recommended_strategy": "flag_invalid",
+      "confidence": 0.99,
+      "explanation": "Physically impossible values (negative age, age > 120) are data entry errors, not natural outliers. These must be reviewed, not statistically treated.",
+      "business_impact": "Invalid ages corrupt customer segmentation, age-based pricing models, and compliance with age-restricted product regulations.",
+      "example": "⚠️ Found 8 records with age > 150 and 3 with age < 0 — these are data entry errors, not outliers. Flagged for manual correction."
+    },
+    {
+      "id": "ot_003",
+      "name": "Natural Outliers in Salary Data",
+      "condition": "Salary/income column with legitimate high values (executives, senior roles)",
+      "recommended_strategy": "keep_and_use_robust_scaling",
+      "confidence": 0.85,
+      "explanation": "Executive salaries are real outliers driven by business hierarchy. Removing them would lose legitimate data. Use RobustScaler (based on median/IQR) instead of StandardScaler.",
+      "business_impact": "Removing executive salaries biases compensation analysis downward and makes benchmarking inaccurate for leadership hiring.",
+      "example": "Kept 15 executive salary outliers (>$200K) — these are legitimate. Applied RobustScaler to normalize without distortion."
+    },
+    {
+      "id": "ot_004",
+      "name": "Outliers in Sensor/IoT Data",
+      "condition": "Sensor readings with sudden spikes or impossible values",
+      "recommended_strategy": "rolling_median_filter",
+      "confidence": 0.91,
+      "explanation": "Sensor spikes are often electrical noise or measurement errors. A rolling median filter smooths these while preserving genuine trends.",
+      "business_impact": "Unfiltered sensor outliers trigger false alarms in manufacturing, causing unnecessary production line shutdowns costing $10K-50K per incident.",
+      "example": "Applied 5-point rolling median filter to 'temperature_sensor' — removed 67 noise spikes while preserving the genuine temperature upward trend."
+    },
+    {
+      "id": "ot_005",
+      "name": "Outliers for ML Model Preparation",
+      "condition": "Preparing features for linear models (Linear Regression, SVM, KNN)",
+      "recommended_strategy": "robust_scaling",
+      "confidence": 0.93,
+      "explanation": "Linear models and distance-based algorithms are sensitive to outliers. RobustScaler uses median and IQR, making it resistant to outlier influence.",
+      "scaling_recommendation": "RobustScaler",
+      "business_impact": "Using StandardScaler with outliers present degrades linear model accuracy by 10-25%. RobustScaler preserves model performance.",
+      "example": "Applied RobustScaler because extreme outliers detected in 3 features — this preserves model accuracy for the downstream linear regression pipeline."
+    },
+    {
+      "id": "ot_006",
+      "name": "Outliers for Tree-Based Models",
+      "condition": "Preparing features for Decision Trees, Random Forest, XGBoost, LightGBM",
+      "recommended_strategy": "keep_as_is",
+      "confidence": 0.95,
+      "explanation": "Tree-based models split data at thresholds and are inherently robust to outliers. Removing outliers is unnecessary and may lose valuable information.",
+      "business_impact": "No treatment needed — tree-based models handle outliers natively, preserving prediction accuracy.",
+      "example": "No outlier treatment applied — dataset will be used with XGBoost which handles outliers natively through threshold-based splits."
+    }
+  ],
+  "decision_tree": [
+    "1. Are values physically impossible (negative age, 0 weight)? → Flag as invalid, manual review",
+    "2. Are outliers in financial/revenue data? → Winsorize at 1st/99th percentile",
+    "3. Are outliers legitimate (executive salaries, enterprise deals)? → Keep + use RobustScaler",
+    "4. Is this sensor/IoT data? → Apply rolling median filter",
+    "5. Is the downstream model tree-based? → No treatment needed",
+    "6. Is the downstream model linear/distance-based? → Apply RobustScaler",
+    "7. Are outliers rare and extreme? → Consider removal only if <1% of data"
+  ]
+}

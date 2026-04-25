@@ -1,0 +1,99 @@
+{
+  "category": "fine_tuning_guide",
+  "description": "Complete guide for fine-tuning Llama 3.1 8B on RTX 4060 using Unsloth QLoRA for DataSoul",
+  "overview": {
+    "goal": "Create a DataSoul-specific LoRA adapter that makes Llama 3.1 8B natively understand data quality terminology, respond in DataSoul's format, and produce expert-level preprocessing recommendations without heavy prompt injection.",
+    "why_fine_tune": [
+      "Reduce system prompt length (RAG context + persona = 2000+ tokens per call — fine-tuning bakes some of this in)",
+      "Consistent output format (tables, severity indicators, confidence scores) without re-explaining format every time",
+      "Faster inference (less prompt = faster response)",
+      "Makes the model 'feel' custom — it speaks DataSoul natively",
+      "Hackathon judges can see: 'We didn't just use an LLM — we trained our own domain expert'"
+    ],
+    "what_we_fine_tune_on": "Instruction-tuning pairs from fine_tune_dataset.jsonl — teaches the model DataSoul's analysis style, format, and domain expertise",
+    "what_we_dont_fine_tune": "Factual knowledge about data science. Llama 3.1 already knows this. We're teaching it HOW to present, not WHAT to know."
+  },
+  "hardware_requirements": {
+    "gpu": "RTX 4060 (8GB VRAM) — sufficient with 4-bit QLoRA",
+    "ram": "16GB+ recommended",
+    "storage": "~10GB free (model + training checkpoints)",
+    "estimated_training_time": "15-30 minutes for 50 training examples, 3 epochs"
+  },
+  "setup_commands": [
+    "# Create a Python virtual environment",
+    "python -m venv datasoul_train",
+    "datasoul_train\\Scripts\\activate",
+    "",
+    "# Install dependencies",
+    "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121",
+    "pip install unsloth[cu121] datasets transformers trl peft accelerate bitsandbytes",
+    "",
+    "# Verify GPU is detected",
+    "python -c \"import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))\""
+  ],
+  "training_script": {
+    "filename": "train_datasoul_lora.py",
+    "description": "Complete training script for DataSoul LoRA adapter",
+    "key_parameters": {
+      "model": "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
+      "load_in_4bit": true,
+      "lora_rank": 16,
+      "lora_alpha": 16,
+      "lora_dropout": 0,
+      "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+      "max_seq_length": 2048,
+      "per_device_train_batch_size": 1,
+      "gradient_accumulation_steps": 4,
+      "num_train_epochs": 3,
+      "learning_rate": 2e-4,
+      "warmup_steps": 5,
+      "fp16": true,
+      "output_dir": "./datasoul_lora_adapter"
+    }
+  },
+  "training_data_format": {
+    "format": "Alpaca instruction format",
+    "template": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou are DataSoul AI, a senior data intelligence analyst.<|eot_id|>\n<|start_header_id|>user<|end_header_id|>\n\n{instruction}\n\n{input}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>\n\n{output}<|eot_id|>",
+    "source_file": "fine_tune_dataset.jsonl",
+    "recommended_dataset_size": {
+      "minimum": 30,
+      "good": 50,
+      "excellent": 100,
+      "how_to_expand": "Run DataSoul on real datasets and save the best responses as new training examples. This creates a flywheel — the model improves as you use it."
+    }
+  },
+  "after_training": {
+    "adapter_output": "./datasoul_lora_adapter (small ~50MB directory)",
+    "how_to_use_with_ollama": [
+      "1. Export to GGUF format using Unsloth's built-in converter",
+      "2. Create Modelfile for Ollama:",
+      "   FROM ./datasoul-llama3.1-8b.Q4_K_M.gguf",
+      "   PARAMETER temperature 0.7",
+      "   PARAMETER top_p 0.9",
+      "   SYSTEM 'You are DataSoul AI, a senior data intelligence analyst...'",
+      "3. ollama create datasoul -f Modelfile",
+      "4. ollama run datasoul",
+      "",
+      "Now 'datasoul' is a custom model name in Ollama that includes your LoRA training!"
+    ],
+    "integration": "The backend will call 'datasoul' model instead of 'llama3.1:8b'. The fine-tuned model responds in DataSoul format natively, requiring less system prompt overhead."
+  },
+  "dual_mode_architecture": {
+    "description": "DataSoul uses BOTH fine-tuning and RAG simultaneously for maximum quality",
+    "flow": [
+      "1. User uploads dataset → profiling runs",
+      "2. RAG retrieves relevant patterns from knowledge base (dynamic, dataset-specific context)",
+      "3. Fine-tuned model receives: short system prompt + RAG context + user query",
+      "4. Model generates response in DataSoul format (trained behavior) with dataset-specific details (RAG knowledge)",
+      "",
+      "Fine-tuning = teaches HOW to respond (format, tone, structure, confidence scores)",
+      "RAG = teaches WHAT to respond (specific patterns, benchmarks, sector knowledge for THIS dataset)",
+      "Together = an expert analyst who speaks your language AND knows your specific data"
+    ],
+    "advantages": [
+      "Fine-tuning alone: knows the format but lacks specific dataset knowledge",
+      "RAG alone: has specific knowledge but outputs in generic LLM format",
+      "Both combined: domain expert who speaks DataSoul's language with dataset-specific intelligence"
+    ]
+  }
+}

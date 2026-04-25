@@ -1,0 +1,86 @@
+{
+  "category": "scaling_strategies",
+  "description": "Decision patterns for feature scaling and normalization",
+  "patterns": [
+    {
+      "id": "sc_001",
+      "name": "Standard Scaling - Normal Distribution",
+      "condition": "Features approximately normally distributed AND no significant outliers",
+      "recommended_strategy": "standard_scaler",
+      "formula": "(x - mean) / std",
+      "confidence": 0.93,
+      "explanation": "StandardScaler transforms features to have mean=0 and std=1. Ideal for normally distributed features without extreme outliers.",
+      "best_for": ["Linear Regression", "SVM", "KNN", "PCA", "Neural Networks"],
+      "pitfalls": "Sensitive to outliers — a single extreme value can shift mean/std and compress the majority of data.",
+      "example": "Applied StandardScaler to 'age' and 'income' — both approximately normal, no extreme outliers detected."
+    },
+    {
+      "id": "sc_002",
+      "name": "Robust Scaling - Outliers Present",
+      "condition": "Features have significant outliers OR skewed distributions",
+      "recommended_strategy": "robust_scaler",
+      "formula": "(x - median) / IQR",
+      "confidence": 0.95,
+      "explanation": "Uses median and interquartile range instead of mean and std. Not influenced by extreme values. The gold standard when outliers are present.",
+      "best_for": ["Linear Regression", "SVM", "KNN", "any model with outlier-prone data"],
+      "pitfalls": "Resulting features may not have 0 mean or unit variance, which some algorithms may expect.",
+      "example": "Applied RobustScaler because extreme outliers detected in salary column (99th percentile: $450K vs median: $62K)."
+    },
+    {
+      "id": "sc_003",
+      "name": "MinMax Scaling - Bounded Range Needed",
+      "condition": "Features need to be in a specific range (0 to 1) OR data has no significant outliers",
+      "recommended_strategy": "minmax_scaler",
+      "formula": "(x - min) / (max - min)",
+      "confidence": 0.88,
+      "explanation": "Squeezes all values into [0, 1] range. Preserves the shape of the original distribution. Ideal when the algorithm requires bounded inputs.",
+      "best_for": ["Neural Networks", "Image Processing", "Features with known bounds"],
+      "pitfalls": "Extremely sensitive to outliers — one extreme value compresses all other values into a tiny range.",
+      "example": "Applied MinMaxScaler to pixel values and percentage features — these have natural [0, 255] and [0, 100] bounds."
+    },
+    {
+      "id": "sc_004",
+      "name": "No Scaling Needed - Tree Models",
+      "condition": "Downstream model is tree-based (Decision Tree, Random Forest, XGBoost, LightGBM, CatBoost)",
+      "recommended_strategy": "no_scaling",
+      "confidence": 0.97,
+      "explanation": "Tree-based models make decisions at split points (thresholds). They are completely scale-invariant — multiplying a feature by 1000 doesn't change the splits.",
+      "best_for": ["Decision Trees", "Random Forest", "XGBoost", "LightGBM", "CatBoost"],
+      "pitfalls": "Adding scaling is harmless but wasteful. It adds unnecessary computation and complexity.",
+      "example": "No scaling applied — preparing data for XGBoost classifier, which is scale-invariant."
+    },
+    {
+      "id": "sc_005",
+      "name": "Log Transformation - Heavily Skewed",
+      "condition": "Feature is heavily right-skewed (skewness > 2) with all positive values",
+      "recommended_strategy": "log_transform",
+      "formula": "log(x + 1)",
+      "confidence": 0.90,
+      "explanation": "Log transformation compresses the range of large values and spreads out small values, making the distribution more normal. The +1 handles zero values.",
+      "best_for": ["Any model expecting normal-like distributions", "Revenue data", "Population data"],
+      "pitfalls": "Cannot handle negative values. Using log(x+1) to handle zeros. Check that transformation actually reduces skewness.",
+      "example": "Applied log(x+1) transform to 'annual_revenue' — skewness reduced from 4.2 to 0.3, making the distribution suitable for linear models."
+    },
+    {
+      "id": "sc_006",
+      "name": "Power Transformation - Moderate Skew",
+      "condition": "Feature has moderate skewness (0.5 < |skewness| < 2)",
+      "recommended_strategy": "power_transform",
+      "formula": "Box-Cox or Yeo-Johnson",
+      "confidence": 0.86,
+      "explanation": "Box-Cox (positive values only) and Yeo-Johnson (handles negatives) find the optimal power to transform the data toward normality.",
+      "best_for": ["Linear models", "Features that need normalization but aren't heavily skewed"],
+      "pitfalls": "Box-Cox requires strictly positive values. Yeo-Johnson is more flexible. The optimal lambda may vary between train/test.",
+      "example": "Applied Yeo-Johnson power transform to 'transaction_amount' — skewness reduced from 1.4 to 0.08."
+    }
+  ],
+  "decision_tree": [
+    "1. Is the model tree-based? → No scaling needed",
+    "2. Are there significant outliers? → RobustScaler",
+    "3. Is the distribution heavily right-skewed (skew > 2, positive values)? → Log transform",
+    "4. Is the distribution moderately skewed? → Power transform (Yeo-Johnson)",
+    "5. Is the distribution approximately normal? → StandardScaler",
+    "6. Does the algorithm need bounded [0,1] inputs? → MinMaxScaler",
+    "7. Default for neural networks? → StandardScaler or MinMaxScaler"
+  ]
+}

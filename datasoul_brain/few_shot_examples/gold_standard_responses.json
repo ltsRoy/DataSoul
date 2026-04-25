@@ -1,0 +1,49 @@
+{
+  "category": "few_shot_examples",
+  "description": "Gold-standard response examples for each DataSoul AI scenario — these train the LLM to produce expert-level, DataSoul-branded outputs",
+  "narrative_examples": [
+    {
+      "scenario": "retail_revenue_analysis",
+      "context": "Retail dataset with 15,000 orders, revenue column, product categories, regions",
+      "perfect_response": "Revenue increased 14% quarter-over-quarter to ₹2.4Cr, driven primarily by Electronics (+23%) in the East region. However, 18% of SKUs showed zero movement over the past 90 days, tying up an estimated ₹8.2L in working capital. The top 20 products account for 67% of total revenue — a classic Pareto distribution suggesting inventory optimization could significantly improve cash flow. Additionally, 340 orders (2.3%) had discount rates exceeding 40%, which may be eroding margins by approximately ₹1.7L annually."
+    },
+    {
+      "scenario": "hr_attrition_analysis",
+      "context": "HR dataset with 1,200 employees, attrition column, department, salary, tenure",
+      "perfect_response": "Attrition rate stands at 16.2%, exceeding the industry benchmark of 10-15%. The Sales department has the highest turnover at 24%, with 78% of departing Sales employees having tenure under 18 months — suggesting an onboarding or role-expectation mismatch. Median salary for departing employees (₹48,500) is 12% below the department median (₹55,200), indicating compensation may be a contributing factor. Addressing the Sales department retention gap alone could save an estimated ₹28L in annual recruitment and training costs."
+    },
+    {
+      "scenario": "healthcare_readmission",
+      "context": "Healthcare dataset with 5,000 patient records, readmission flag, diagnosis, length of stay",
+      "perfect_response": "30-day readmission rate is 18.4%, exceeding the CMS benchmark of 15.6%. The Cardiology department has the highest readmission rate at 23.7%, with patients having an average length of stay 1.3 days shorter than non-readmitted patients — suggesting premature discharge may be a factor. 12% of records have missing discharge diagnosis codes, which affects both clinical tracking and reimbursement accuracy. Reducing Cardiology readmissions to the hospital average could improve patient outcomes while saving an estimated $340K in Medicare penalties annually."
+    },
+    {
+      "scenario": "data_quality_threat_explanation",
+      "context": "Any dataset with missing values in a critical column",
+      "perfect_response": "⚠️ CRITICAL THREAT: Missing Values in 'customer_id'\n\n🔍 Problem: 47 records (3.1%) have missing customer_id values.\n\n💥 Impact: Customer-level analytics are unreliable. Revenue attribution is broken for these 47 transactions totaling ₹2.3L. Customer count is understated, and churn analysis excludes these records entirely.\n\n📊 Confidence: 99% — ID fields should never have missing values.\n\n🎯 Recommended Actions:\n1. [INVESTIGATE] Check the data pipeline for the date range of these records — likely an API integration failure\n2. [CROSS-REFERENCE] Match against the CRM system using order details (date, amount, product) as secondary keys\n3. [FLAG] Mark these records as 'unattributed' rather than deleting them — the transaction data is still valuable for aggregate analysis\n\n⏱️ Estimated Resolution: 2-4 hours with CRM access"
+    },
+    {
+      "scenario": "preprocessing_strategy_recommendation",
+      "context": "Column with right-skewed salary data, 12% missing, HR dataset",
+      "perfect_response": "📋 Preprocessing Strategy for 'monthly_salary'\n\n1. IMPUTATION: Median (₹62,400)\n   • Confidence: 95%\n   • Reason: Distribution is right-skewed (skewness: 2.1). Mean (₹78,200) is inflated by executive salaries. Median better represents the typical employee.\n   • Alternative: KNN imputation (confidence: 82%) — considers department and job level for more personalized estimates.\n\n2. SCALING: RobustScaler\n   • Confidence: 93%\n   • Reason: Executive salary outliers (>₹3L) would dominate StandardScaler's mean/std calculation. RobustScaler uses median/IQR, naturally resistant to these outliers.\n\n3. OUTLIER TREATMENT: Keep + Flag\n   • Confidence: 85%\n   • Reason: Executive salaries (15 records >₹2.5L) are legitimate business values, not errors. Removing them would bias compensation analysis downward.\n\n⚠️ Compliance Note: Salary imputation in HR datasets should be reviewed by the HR/Finance team before final approval — imputed values should not be used for individual employee compensation decisions."
+    }
+  ],
+  "chat_examples": [
+    {
+      "question": "Which columns have the most missing values?",
+      "context": "Dataset profiling results available",
+      "perfect_response": "Here's a breakdown of missing values by column, ranked by severity:\n\n| Column | Missing % | Missing Count | Severity |\n|--------|----------|---------------|----------|\n| fax_number | 87.3% | 4,365 | 🔴 Consider dropping |\n| middle_name | 34.2% | 1,710 | 🟡 High — needs strategy |\n| department | 12.1% | 605 | 🟡 Moderate — imputable |\n| salary | 8.4% | 420 | 🟡 Moderate — imputable |\n| email | 1.2% | 60 | 🟢 Low — easy fix |\n\n**Recommendation:** Drop 'fax_number' (87% missing adds no value). Use median for 'salary' (right-skewed), mode for 'department', and investigate 'middle_name' — 34% missing may be intentional (not all people have middle names)."
+    },
+    {
+      "question": "Is this dataset ready for a churn prediction model?",
+      "context": "Dataset with customer features and churn label",
+      "perfect_response": "**ML Readiness Assessment: Churn Prediction**\n\n✅ **Ready:** Target variable ('churn') is present and binary (Yes/No)\n⚠️ **Caution:** Class imbalance detected — 88% No Churn, 12% Churn\n🔴 **Blocker:** Potential target leakage in 'last_activity_date' (correlation: 0.92 with churn)\n🟡 **Action Needed:** 3 columns have >15% missing values\n\n**Readiness Score: 62/100 (Needs Work)**\n\nBefore training, you must:\n1. Remove 'last_activity_date' (leakage risk)\n2. Handle class imbalance (recommend SMOTE + class_weight='balanced')\n3. Impute missing values in 'tenure', 'monthly_charges', 'total_charges'\n4. Use F1-score as your metric, NOT accuracy (accuracy would be 88% by always predicting 'No Churn')"
+    }
+  ],
+  "action_plan_examples": [
+    {
+      "scenario": "30_day_action_plan_retail",
+      "perfect_response": "## 30-Day Data Action Plan\n\n**Week 1: Data Hygiene**\n- Resolve 132 duplicate customer records\n- Standardize 23 product category variations\n- Fix 47 missing customer_id records via CRM lookup\n\n**Week 2: Quality Improvement**\n- Implement validation rules for new data entry\n- Set up automated duplicate detection\n- Clean and standardize 'city' column (89 → 34 unique values)\n\n**Week 3: Analytics Enhancement**\n- Build cleaned dataset for quarterly business review\n- Generate customer segmentation with de-duplicated data\n- Create inventory optimization report for zero-movement SKUs\n\n**Week 4: Governance & Monitoring**\n- Set up data quality monitoring dashboard\n- Define data quality KPIs and SLAs\n- Document data cleaning decisions in audit trail\n\n**Expected ROI:** ₹12L annually in better inventory decisions, ₹4L in reduced duplicate marketing spend, 120 analyst hours saved per quarter."
+    }
+  ]
+}

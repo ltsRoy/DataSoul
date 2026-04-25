@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.env
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Data & uploads
+backend/uploads/
+backend/sample_datasets/
+backend/chroma_db/
+backend/rag_store/
+datasoul_brain/scraped/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Test artifacts
+backend/test_ollama.py
+
+# Misc
+*.log
+npm-debug.log*

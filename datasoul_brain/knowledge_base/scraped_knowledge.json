@@ -1,0 +1,576 @@
+{
+  "scraped_at": "2026-04-21T14:12:12.256332",
+  "total_chunks": 95,
+  "chunks": [
+    {
+      "text": "## Missing Value Imputation — Numeric (Normal Distribution)\n\nFor numeric columns with approximately normal distribution (skewness between -0.5 and 0.5), mean imputation is appropriate. The mean preserves the expected value of the distribution. Use `sklearn.impute.SimpleImputer(strategy='mean')`. Confidence: 90%. Alternative: KNN imputation using sklearn.impute.KNNImputer(n_neighbors=5) for better accuracy when features are correlated.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Value Imputation — Numeric (Skewed Distribution)\n\nFor numeric columns with right-skewed distribution (skewness > 0.5), median imputation is preferred. The mean is pulled toward the tail by outliers. Example: salary data (skewness=2.1) has mean ₹78,200 but median ₹62,400 — the median better represents a typical value. Use `SimpleImputer(strategy='median')`. Confidence: 92%.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Value Imputation — Categorical (Low Cardinality)\n\nFor categorical columns with fewer than 10 unique values, mode imputation preserves the dominant class distribution. Use `SimpleImputer(strategy='most_frequent')`. Confidence: 86%. Caution: If the missingness is informative (e.g., 'payment_method' is missing for cash transactions), adding an 'Unknown' category is better.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Value Imputation — MICE (Multiple Imputation)\n\nMICE (Multiple Imputation by Chained Equations) uses all other features to predict missing values iteratively. Use `sklearn.impute.IterativeImputer` with BayesianRidge or RandomForestRegressor estimators. Best for: datasets where features are correlated, missing rate is 5-30%, and accuracy matters more than speed. Confidence: 85%.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Value Imputation — KNN Imputation\n\nKNN imputation finds the K nearest neighbors and uses their values to fill missing entries. Use `sklearn.impute.KNNImputer(n_neighbors=5, weights='distance')`. Best for: small-to-medium datasets (<50K rows) with spatial relationships between features. Slower than simple imputation but more accurate. Confidence: 83%.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Values — When to Drop Columns\n\nDrop a column when: (1) Missing rate exceeds 60-70% — insufficient signal remains. (2) The column has no analytical value (e.g., internal IDs, fax numbers). (3) The column is a near-duplicate of another column. Always check: Is the missingness itself informative? If yes, create a binary missing indicator before dropping. Rule: missingness > 50% AND low feature importance → safe to drop.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Missing Values — When to Drop Rows\n\nDrop rows when: (1) Missing count is very small (<1% of dataset). (2) The row has missing values in critical columns (e.g., target variable). (3) Dropping doesn't introduce selection bias. Never drop rows if the missing pattern is systematic (MNAR — Missing Not At Random). Check with Little's MCAR test.",
+      "source": "builtin_knowledge",
+      "category": "imputation",
+      "url": ""
+    },
+    {
+      "text": "## Duplicate Detection — Exact Duplicates\n\nExact duplicates have identical values across all columns. Detection: `df.duplicated()`. Impact: inflates counts, averages, and ML training signal. Common causes: (1) Double-click form submissions, (2) ETL pipeline re-runs, (3) Merge operations without deduplication. Always verify before removing — some datasets legitimately have identical rows (e.g., multiple purchases of same item).",
+      "source": "builtin_knowledge",
+      "category": "duplicates",
+      "url": ""
+    },
+    {
+      "text": "## Duplicate Detection — Near Duplicates (Fuzzy)\n\nNear-duplicates differ in minor ways: trailing spaces, case differences, or typos. Detection methods: (1) Lowercased comparison, (2) Levenshtein distance < 3, (3) Soundex/Metaphone for name matching, (4) RecordLinkage library for large-scale deduplication. Example: 'John Smith' vs 'john smith' vs 'John  Smith' — all likely the same person.",
+      "source": "builtin_knowledge",
+      "category": "duplicates",
+      "url": ""
+    },
+    {
+      "text": "## Outlier Detection — IQR Method\n\nThe Interquartile Range method identifies outliers as values below Q1 - 1.5×IQR or above Q3 + 1.5×IQR. Use 3×IQR for extreme outliers. Strengths: non-parametric, works on skewed data. Weakness: assumes unimodal distribution. Implementation: `q1, q3 = df[col].quantile([0.25, 0.75]); iqr = q3 - q1; lower = q1 - 1.5*iqr; upper = q3 + 1.5*iqr`.",
+      "source": "builtin_knowledge",
+      "category": "outliers",
+      "url": ""
+    },
+    {
+      "text": "## Outlier Detection — Z-Score Method\n\nZ-score measures how many standard deviations a value is from the mean. Values with |z| > 3 are typically considered outliers. Strengths: simple, well-understood. Weakness: assumes normal distribution, sensitive to extreme values (the outliers affect the mean/std used to detect them). Use Modified Z-Score (using median and MAD) for robustness.",
+      "source": "builtin_knowledge",
+      "category": "outliers",
+      "url": ""
+    },
+    {
+      "text": "## Outlier Detection — Isolation Forest\n\nIsolation Forest is an unsupervised ML method that isolates anomalies by random feature splitting. Outliers require fewer splits to isolate. Use `sklearn.ensemble.IsolationForest(contamination=0.05)`. Best for: multivariate outlier detection, high-dimensional data, non-linear patterns. Confidence: 82%.",
+      "source": "builtin_knowledge",
+      "category": "outliers",
+      "url": ""
+    },
+    {
+      "text": "## Outlier Treatment — Winsorization\n\nWinsorization caps extreme values at a specified percentile rather than removing them. Example: cap at 1st and 99th percentiles. Benefits: preserves sample size, reduces outlier influence. Use `scipy.stats.mstats.winsorize(data, limits=[0.01, 0.01])`. Best for: financial data where extreme values are legitimate but distort statistics.",
+      "source": "builtin_knowledge",
+      "category": "outliers",
+      "url": ""
+    },
+    {
+      "text": "## Outlier Treatment — Log Transform\n\nLog transformation compresses the range of right-skewed data, reducing the impact of outliers. Use `np.log1p(x)` (adds 1 to handle zeros). Best for: revenue, salary, population data. After transformation, StandardScaler can be applied safely. Reversal: `np.expm1(x)`. Warning: doesn't work with negative values.",
+      "source": "builtin_knowledge",
+      "category": "outliers",
+      "url": ""
+    },
+    {
+      "text": "## Encoding — One-Hot Encoding\n\nOne-hot encoding creates binary columns for each category. Use when: (1) Cardinality ≤ 10-15, (2) No ordinal relationship, (3) Tree models or neural networks as downstream model. Implementation: `pd.get_dummies(df, columns=['col'])` or `sklearn.preprocessing.OneHotEncoder(handle_unknown='ignore')`. Warning: drops one column for linear models to avoid multicollinearity (drop='first').",
+      "source": "builtin_knowledge",
+      "category": "encoding",
+      "url": ""
+    },
+    {
+      "text": "## Encoding — Label Encoding\n\nLabel encoding assigns integers to categories. Use ONLY for: (1) Binary columns, (2) Ordinal data with natural ordering (e.g., Low < Medium < High), (3) Tree-based models (which can split on numeric values). Never use for nominal data with linear models — the model will assume numeric relationships between categories.",
+      "source": "builtin_knowledge",
+      "category": "encoding",
+      "url": ""
+    },
+    {
+      "text": "## Encoding — Target Encoding\n\nTarget encoding replaces each category with the mean of the target variable for that category. Use when: (1) High cardinality (20-100 unique values), (2) Strong relationship between feature and target. Implementation: `sklearn.preprocessing.TargetEncoder()`. Warning: prone to overfitting — use with cross-validation or smoothing.",
+      "source": "builtin_knowledge",
+      "category": "encoding",
+      "url": ""
+    },
+    {
+      "text": "## Encoding — Frequency/Count Encoding\n\nFrequency encoding replaces each category with its occurrence count or frequency. Advantages: handles any cardinality, no dimensionality increase. Implementation: `df['col_freq'] = df['col'].map(df['col'].value_counts())`. Works well with gradient boosting models (XGBoost, LightGBM).",
+      "source": "builtin_knowledge",
+      "category": "encoding",
+      "url": ""
+    },
+    {
+      "text": "## Scaling — StandardScaler\n\nStandardScaler performs z-score normalization: (x - mean) / std. Result: mean=0, std=1. Use when: (1) Features are approximately normal, (2) Algorithm is distance-based (KNN, SVM, PCA), (3) No significant outliers. Implementation: `sklearn.preprocessing.StandardScaler()`. Important: fit on training data only, transform both train and test.",
+      "source": "builtin_knowledge",
+      "category": "scaling",
+      "url": ""
+    },
+    {
+      "text": "## Scaling — MinMaxScaler\n\nMinMaxScaler scales features to [0, 1] range: (x - min) / (max - min). Use when: (1) Neural networks (many activation functions work best with [0,1] input), (2) Image pixel values, (3) No extreme outliers. Warning: very sensitive to outliers — a single extreme value compresses all other values.",
+      "source": "builtin_knowledge",
+      "category": "scaling",
+      "url": ""
+    },
+    {
+      "text": "## Scaling — RobustScaler\n\nRobustScaler uses median and IQR for scaling: (x - median) / IQR. Use when: (1) Outliers are present but legitimate, (2) Distribution is skewed, (3) You want to preserve outlier information. Implementation: `sklearn.preprocessing.RobustScaler(quantile_range=(25, 75))`. Best for: salary data, financial transactions, sensor readings.",
+      "source": "builtin_knowledge",
+      "category": "scaling",
+      "url": ""
+    },
+    {
+      "text": "## Feature Engineering — Date Decomposition\n\nExtract temporal features from date columns: year, month, day, day_of_week, quarter, is_weekend, hour (if timestamp). These capture seasonal patterns, weekly cycles, and temporal trends. Implementation: `df['month'] = pd.to_datetime(df['date']).dt.month`. Consider also: days_since_event, is_holiday, fiscal_quarter.",
+      "source": "builtin_knowledge",
+      "category": "feature_engineering",
+      "url": ""
+    },
+    {
+      "text": "## Feature Engineering — Binning / Discretization\n\nBinning converts continuous variables into categorical ranges. Methods: (1) Equal-width: `pd.cut(df['col'], bins=5)`, (2) Equal-frequency: `pd.qcut(df['col'], q=5)`, (3) Domain-specific: manual thresholds (e.g., age groups). Benefits: handles non-linear relationships, reduces noise. Use quantile binning for skewed distributions.",
+      "source": "builtin_knowledge",
+      "category": "feature_engineering",
+      "url": ""
+    },
+    {
+      "text": "## Feature Engineering — Interaction Features\n\nInteraction features capture relationships between pairs of features. Example: `price_per_unit = total_price / quantity`. Types: (1) Multiplicative: A × B, (2) Ratio: A / B, (3) Difference: A - B, (4) Polynomial: A², A³. Use `sklearn.preprocessing.PolynomialFeatures(degree=2, interaction_only=True)` for systematic generation.",
+      "source": "builtin_knowledge",
+      "category": "feature_engineering",
+      "url": ""
+    },
+    {
+      "text": "## Feature Engineering — Text Feature Extraction\n\nExtract features from text columns: (1) Length: `df['text_len'] = df['text'].str.len()`, (2) Word count: `str.split().apply(len)`, (3) TF-IDF: `sklearn.feature_extraction.text.TfidfVectorizer(max_features=100)`, (4) Embeddings: sentence-transformers for semantic features. Use for: product descriptions, notes, comments fields.",
+      "source": "builtin_knowledge",
+      "category": "feature_engineering",
+      "url": ""
+    },
+    {
+      "text": "## Data Type Detection — Numeric as String\n\nCommon pattern: numeric values stored as strings due to currency symbols ($, ₹, €), percentage signs (%), commas (1,000), or mixed entries. Detection: check if >80% of values parse as float after removing $₹€%,. Fix: `df['col'] = df['col'].replace('[\\$₹€%,]', '', regex=True).astype(float)`. Impact: prevents all numeric operations.",
+      "source": "builtin_knowledge",
+      "category": "data_types",
+      "url": ""
+    },
+    {
+      "text": "## Data Type Detection — Mixed Types\n\nMixed type columns contain both numeric and string values. Common causes: (1) Data entry errors, (2) Special codes mixed with values (e.g., 'N/A', 'TBD'), (3) CSV parsing issues. Detection: `pd.to_numeric(df['col'], errors='coerce')` — NaN count shows non-numeric entries. Fix: separate into numeric value + flag column.",
+      "source": "builtin_knowledge",
+      "category": "data_types",
+      "url": ""
+    },
+    {
+      "text": "## Data Type Detection — Date Format Ambiguity\n\nAmbiguous dates: '05/06/2024' could be May 6 or June 5. Detection: (1) Check if any value has day>12 (resolves format), (2) Check consistency within column. Fix: use `pd.to_datetime(df['col'], dayfirst=True)` with explicit format. Best practice: always store dates in ISO 8601 (YYYY-MM-DD) format.",
+      "source": "builtin_knowledge",
+      "category": "data_types",
+      "url": ""
+    },
+    {
+      "text": "## Class Imbalance Detection and Treatment\n\nClass imbalance: when target variable classes have very different frequencies. Example: fraud detection (0.1% fraud). Metrics: use F1, precision, recall, AUC-ROC — NOT accuracy. Treatment: (1) SMOTE: `imblearn.over_sampling.SMOTE()`, (2) class_weight='balanced' in sklearn models, (3) Undersample majority: `RandomUnderSampler()`, (4) Ensemble: `BalancedRandomForestClassifier()`.",
+      "source": "builtin_knowledge",
+      "category": "ml_preprocessing",
+      "url": ""
+    },
+    {
+      "text": "## Feature Selection — Correlation-Based\n\nRemove highly correlated features (|r| > 0.95) to reduce multicollinearity. Steps: (1) Compute correlation matrix, (2) For each pair with |r| > 0.95, drop the one with lower correlation to target, (3) Use VIF (Variance Inflation Factor) > 10 threshold for linear models. Implementation: `df.corr()` + iterative dropping.",
+      "source": "builtin_knowledge",
+      "category": "feature_selection",
+      "url": ""
+    },
+    {
+      "text": "## Feature Selection — Mutual Information\n\nMutual information measures non-linear dependency between feature and target. Use `sklearn.feature_selection.mutual_info_classif` (classification) or `mutual_info_regression` (regression). Advantages over correlation: captures non-linear relationships. Threshold: keep features with MI > 0.01 or top K features.",
+      "source": "builtin_knowledge",
+      "category": "feature_selection",
+      "url": ""
+    },
+    {
+      "text": "## PII Detection — Email Addresses\n\nRegex pattern for email detection: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}`. Impact: GDPR Article 4 classifies email as personal data. Treatment: (1) Hash with SHA-256 for pseudonymization, (2) Extract domain only if needed, (3) Drop if not required for analysis. Compliance: GDPR, CCPA, PIPEDA.",
+      "source": "builtin_knowledge",
+      "category": "privacy",
+      "url": ""
+    },
+    {
+      "text": "## PII Detection — Phone Numbers\n\nPhone number patterns vary by country. General regex: `\\+?\\d{1,3}[-.\\s]?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}`. Indian: `[6-9]\\d{9}`. Treatment: (1) Hash for analytics, (2) Keep only country code + first 2 digits for geographic analysis, (3) Drop entirely if not needed.",
+      "source": "builtin_knowledge",
+      "category": "privacy",
+      "url": ""
+    },
+    {
+      "text": "## PII Detection — National IDs (SSN, Aadhaar, PAN)\n\nSSN pattern: `\\d{3}-\\d{2}-\\d{4}`. Aadhaar: `\\d{4}\\s\\d{4}\\s\\d{4}`. PAN: `[A-Z]{5}\\d{4}[A-Z]`. These are the HIGHEST sensitivity PII. Treatment: immediate removal from analytics datasets. If needed for linkage: use one-way hash with salt. Compliance: critical for GDPR, CCPA, India DPDPA.",
+      "source": "builtin_knowledge",
+      "category": "privacy",
+      "url": ""
+    },
+    {
+      "text": "## Data Quality — Consistency Checks\n\nConsistency checks verify data conforms to business rules. Examples: (1) Order date before ship date, (2) Quantity > 0 for completed orders, (3) State matches zip code, (4) Age consistent with birth date, (5) Sum of parts equals total. Implementation: create validation rules as boolean columns and measure pass rate.",
+      "source": "builtin_knowledge",
+      "category": "data_quality",
+      "url": ""
+    },
+    {
+      "text": "## Data Quality — Referential Integrity\n\nReferential integrity ensures foreign key references are valid. Check: every customer_id in orders exists in customers table. Detection: `orders[~orders['customer_id'].isin(customers['customer_id'])]`. Impact: broken references cause join failures and incomplete analysis. Fix: flag orphan records, investigate source system.",
+      "source": "builtin_knowledge",
+      "category": "data_quality",
+      "url": ""
+    },
+    {
+      "text": "## Data Quality — Temporal Consistency\n\nTime-series data should be temporally consistent: (1) No future dates, (2) Monotonically increasing for sequential events, (3) No impossible gaps. Detection: `df['date'].diff()` to find gaps. Common issues: timezone mismatches, daylight saving transitions, server clock drift.",
+      "source": "builtin_knowledge",
+      "category": "data_quality",
+      "url": ""
+    },
+    {
+      "text": "## Correlation Analysis — Pearson vs Spearman\n\nPearson correlation measures linear relationship (r ∈ [-1, 1]). Use when: both variables are continuous and approximately normal. Spearman correlation measures monotonic relationship using ranks. Use when: variables are ordinal, or non-linear monotonic relationships exist. Implementation: `df.corr(method='pearson')` or `df.corr(method='spearman')`.",
+      "source": "builtin_knowledge",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Distribution Analysis — Normality Tests\n\nTests for normality: (1) Shapiro-Wilk: `scipy.stats.shapiro(data)` — best for n < 5000, (2) D'Agostino-Pearson: `scipy.stats.normaltest(data)` — good general test, (3) Anderson-Darling: `scipy.stats.anderson(data)` — stricter test. Visual: Q-Q plot, histogram. Quick check: |skewness| < 2 and |kurtosis| < 7.",
+      "source": "builtin_knowledge",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Sampling Strategies for Large Datasets\n\nWhen datasets exceed available memory: (1) Random sampling: `df.sample(frac=0.1)` for 10%, (2) Stratified: maintain class proportions with `sklearn.model_selection.StratifiedShuffleSplit`, (3) Systematic: every nth row, (4) Chunked processing: `pd.read_csv(file, chunksize=10000)`. Profile on sample, validate on full dataset.",
+      "source": "builtin_knowledge",
+      "category": "big_data",
+      "url": ""
+    },
+    {
+      "text": "## ETL Data Quality Gates\n\nImplement quality gates in ETL pipelines: (1) Schema validation: expected columns, types, and constraints, (2) Volume check: row count within expected range, (3) Freshness check: max(date) within expected recency, (4) Statistical checks: mean/std within historical range, (5) Null rate thresholds. Use Great Expectations library or custom validators.",
+      "source": "builtin_knowledge",
+      "category": "data_quality",
+      "url": ""
+    },
+    {
+      "text": "## Retail — Customer Lifetime Value (CLV)\n\nCLV = (Average Order Value) × (Purchase Frequency) × (Customer Lifespan). Typical retail CLV ranges: Low ($50-200), Medium ($200-1000), High ($1000+). Key columns: customer_id, order_date, total_amount. Missing customer_ids make CLV impossible — critical threat. Data quality target: <1% missing customer IDs.",
+      "source": "builtin_sector_retail",
+      "category": "sector_retail",
+      "url": ""
+    },
+    {
+      "text": "## Retail — RFM Segmentation\n\nRFM (Recency, Frequency, Monetary) segments customers into tiers. Recency: days since last purchase. Frequency: total purchases. Monetary: total spend. Score each 1-5. Champions (5,5,5), At Risk (1,x,x), New Customers (5,1,1). Requires: customer_id, order_date, total_amount columns.",
+      "source": "builtin_sector_retail",
+      "category": "sector_retail",
+      "url": ""
+    },
+    {
+      "text": "## Retail — Market Basket Analysis\n\nAssociation rule mining finds products frequently purchased together. Metrics: Support (how often items appear together), Confidence (probability of B given A), Lift (>1 means positive association). Use `mlxtend.frequent_patterns.apriori`. Requires: transaction_id, product_id. Data cleaning: remove returns, handle quantity>1.",
+      "source": "builtin_sector_retail",
+      "category": "sector_retail",
+      "url": ""
+    },
+    {
+      "text": "## Retail — Inventory Metrics\n\nKey inventory metrics: (1) Stock Turnover = COGS / Average Inventory, (2) Days of Supply = Inventory / Daily Sales, (3) Dead Stock: items with zero sales > 90 days, (4) Stockout Rate: % of days with zero inventory. Dead stock ties up working capital. Industry benchmark: turnover ratio 5-10x for general retail.",
+      "source": "builtin_sector_retail",
+      "category": "sector_retail",
+      "url": ""
+    },
+    {
+      "text": "## Retail — Discount Impact Analysis\n\nMeasure discount effectiveness: (1) Discount penetration: % of orders with discounts, (2) Average discount depth: mean discount %, (3) Incremental revenue: sales lift vs. non-discounted periods, (4) Margin impact: revenue × discount rate. Industry concern: >30% discount penetration may indicate dependency. A/B test to verify incrementality.",
+      "source": "builtin_sector_retail",
+      "category": "sector_retail",
+      "url": ""
+    },
+    {
+      "text": "## Healthcare — Readmission Risk Factors\n\nKey readmission predictors: (1) Length of stay >7 days, (2) Multiple comorbidities (CCI>3), (3) ED visits in prior 6 months, (4) Medication count >10, (5) Discharge to home without services. CMS benchmark: 30-day all-cause readmission rate <15.6%. Penalty: up to 3% Medicare reimbursement reduction.",
+      "source": "builtin_sector_healthcare",
+      "category": "sector_healthcare",
+      "url": ""
+    },
+    {
+      "text": "## Healthcare — HIPAA Compliance in Data Analysis\n\n18 HIPAA identifiers that must be removed for de-identification: name, geography (smaller than state), dates (except year), phone, fax, email, SSN, MRN, health plan number, account number, certificate/license, VIN, device ID, URL, IP, biometric, photo, any unique identifier. Safe Harbor method: remove all 18. Expert Determination: statistical verification.",
+      "source": "builtin_sector_healthcare",
+      "category": "sector_healthcare",
+      "url": ""
+    },
+    {
+      "text": "## Healthcare — ICD Code Analysis\n\nICD-10 codes have structured format: letter + 2 digits + dot + up to 4 characters. First 3 characters = category (e.g., I21 = Acute MI). Missing ICD codes impact: (1) Revenue leakage ($500-$2000/encounter), (2) Quality reporting, (3) Population health analysis. Data quality: ICD completeness should be >98% for billing data.",
+      "source": "builtin_sector_healthcare",
+      "category": "sector_healthcare",
+      "url": ""
+    },
+    {
+      "text": "## Healthcare — Length of Stay Optimization\n\nAverage Length of Stay (ALOS) benchmarks vary by procedure. National average: 4.5 days. Each excess day costs $2,000-$3,000. Predictors of extended stays: complications, comorbidities, weekend admission, surgical vs medical. Analysis requires: admission_date, discharge_date, DRG code, diagnosis.",
+      "source": "builtin_sector_healthcare",
+      "category": "sector_healthcare",
+      "url": ""
+    },
+    {
+      "text": "## Finance — Fraud Detection Patterns\n\nCommon fraud indicators: (1) Transaction velocity: >X transactions in Y minutes, (2) Geographic impossibility: transactions in different countries within hours, (3) Amount anomalies: round amounts, just below review thresholds, (4) Merchant category shifts. Class imbalance: fraud typically <0.1% — use SMOTE + F1 metric, not accuracy.",
+      "source": "builtin_sector_finance",
+      "category": "sector_finance",
+      "url": ""
+    },
+    {
+      "text": "## Finance — Credit Risk Modeling\n\nCredit scoring features: (1) Payment history (35% weight in FICO), (2) Credit utilization (30%), (3) Length of credit history (15%), (4) Credit mix (10%), (5) New credit inquiries (10%). Data requirements: default flag, loan amount, DTI ratio, employment history. Missing income data is critical — affects risk segmentation.",
+      "source": "builtin_sector_finance",
+      "category": "sector_finance",
+      "url": ""
+    },
+    {
+      "text": "## Finance — Anti-Money Laundering (AML)\n\nAML data patterns: (1) Structuring: deposits just below $10K reporting threshold, (2) Round-trip transactions, (3) Rapid movement across accounts, (4) Shell company patterns. Data quality for AML: customer identity completeness >99%, transaction timestamp accuracy to seconds. Regulatory: BSA, FinCEN, EU AMLD.",
+      "source": "builtin_sector_finance",
+      "category": "sector_finance",
+      "url": ""
+    },
+    {
+      "text": "## HR — Employee Attrition Prediction\n\nTop attrition predictors: (1) Overtime (Yes/No), (2) Years since last promotion, (3) Work-life balance score, (4) Monthly income relative to role median, (5) Number of companies worked. Class imbalance: typical attrition rate 10-20%. Use: `class_weight='balanced'`, SMOTE oversample minority, F1 as primary metric.",
+      "source": "builtin_sector_hr",
+      "category": "sector_hr",
+      "url": ""
+    },
+    {
+      "text": "## HR — Pay Equity Analysis\n\nPay equity analysis checks for compensation disparities across protected groups. Method: regression controlling for job level, experience, performance, location. Key: salary data must be complete (missing salary = critical threat). PII handling: anonymize before analysis. Legal: Equal Pay Act, Title VII. Data needs: salary, gender, ethnicity, job_level, tenure.",
+      "source": "builtin_sector_hr",
+      "category": "sector_hr",
+      "url": ""
+    },
+    {
+      "text": "## HR — Workforce Planning Metrics\n\nKey HR metrics: (1) Headcount trend, (2) Turnover rate: departures/average headcount, (3) Time to fill: days from requisition to hire, (4) Cost per hire, (5) Revenue per employee, (6) Absenteeism rate. Industry benchmarks: voluntary turnover 10-15% annually, time to fill 30-45 days, cost per hire $3,000-$5,000.",
+      "source": "builtin_sector_hr",
+      "category": "sector_hr",
+      "url": ""
+    },
+    {
+      "text": "## Manufacturing — OEE Calculation\n\nOverall Equipment Effectiveness = Availability × Performance × Quality. Availability: actual run time / planned production time. Performance: actual output / theoretical max output. Quality: good parts / total parts. World-class OEE: 85%+. Typical: 60-65%. Requires: machine uptime, cycle time, defect count, production target data.",
+      "source": "builtin_sector_manufacturing",
+      "category": "sector_manufacturing",
+      "url": ""
+    },
+    {
+      "text": "## Manufacturing — Predictive Maintenance\n\nPredict machine failure from sensor data. Features: vibration (Hz), temperature (°C), pressure (PSI), current (A), acoustic emissions. Models: Random Forest, LSTM for time-series. Key metric: MTBF (Mean Time Between Failures). Data quality: sensor gaps and anomalous readings must be cleaned. Use rolling median filter for noise.",
+      "source": "builtin_sector_manufacturing",
+      "category": "sector_manufacturing",
+      "url": ""
+    },
+    {
+      "text": "## Manufacturing — Statistical Process Control (SPC)\n\nSPC uses control charts to monitor process stability. Upper/Lower Control Limits = mean ± 3σ. Nelson rules detect non-random patterns: (1) Point beyond 3σ, (2) 9 consecutive points on same side, (3) 6 consecutive increasing/decreasing. Data needs: measurement, timestamp, machine_id, batch_number. Sensor accuracy is critical.",
+      "source": "builtin_sector_manufacturing",
+      "category": "sector_manufacturing",
+      "url": ""
+    },
+    {
+      "text": "## Education — Student Dropout Prediction\n\nKey dropout predictors: (1) GPA trend (declining), (2) Attendance rate <80%, (3) Failed courses in first year, (4) Financial aid status, (5) First-generation student, (6) Part-time employment >20 hrs. Data requirements: enrollment data, grades, attendance, financial aid records. Privacy: FERPA compliance required for student data.",
+      "source": "builtin_sector_education",
+      "category": "sector_education",
+      "url": ""
+    },
+    {
+      "text": "## Education — Learning Analytics\n\nTrack student engagement: (1) LMS login frequency, (2) Assignment submission timeliness, (3) Discussion participation, (4) Video watch completion, (5) Quiz attempt patterns. Predictive models: at-risk students identified by week 3 with 80% accuracy using engagement features. Data cleaning: remove test accounts, handle multiple enrollments.",
+      "source": "builtin_sector_education",
+      "category": "sector_education",
+      "url": ""
+    },
+    {
+      "text": "## Logistics — Route Optimization Data\n\nKey logistics data: origin, destination, distance, travel_time, fuel_cost, vehicle_capacity, delivery_window, weight. Data quality issues: (1) GPS coordinate errors (lat/long swapped), (2) Impossible delivery times (negative duration), (3) Missing weight data prevents capacity planning. Benchmark: on-time delivery rate >95%.",
+      "source": "builtin_sector_logistics",
+      "category": "sector_logistics",
+      "url": ""
+    },
+    {
+      "text": "## Logistics — Demand Forecasting\n\nForecast methods: (1) Moving average for stable demand, (2) Exponential smoothing for trends, (3) ARIMA for seasonal patterns, (4) Prophet for complex seasonality + holidays. Data needs: daily/weekly demand, at least 2 years history. Data quality: missing dates must be interpolated, not dropped. Zero demand ≠ missing demand.",
+      "source": "builtin_sector_logistics",
+      "category": "sector_logistics",
+      "url": ""
+    },
+    {
+      "text": "## Real Estate — Automated Valuation Models (AVM)\n\nAVM features: sqft, bedrooms, bathrooms, lot_size, year_built, garage, pool, neighborhood, school_district, proximity to amenities. Common data issues: (1) Inconsistent sqft (finished vs total), (2) Missing year_built, (3) Duplicate listings across MLS systems, (4) Stale listings. Price per sqft is key normalized metric.",
+      "source": "builtin_sector_real_estate",
+      "category": "sector_real_estate",
+      "url": ""
+    },
+    {
+      "text": "## Real Estate — Market Analysis Metrics\n\nKey market indicators: (1) Median sale price trend, (2) Days on market (DOM), (3) Sale-to-list ratio, (4) Inventory months of supply (4-6 = balanced, <4 = seller's, >6 = buyer's), (5) Price per sqft by neighborhood. Data needs: listing_date, sold_date, listing_price, sale_price. Stale listings (>180 days) should be flagged.",
+      "source": "builtin_sector_real_estate",
+      "category": "sector_real_estate",
+      "url": ""
+    },
+    {
+      "text": "## Cross-Validation Strategy\n\nUse k-fold cross-validation (k=5 or 10) to evaluate model performance. For time-series: use TimeSeriesSplit. For small datasets: use Leave-One-Out or repeated k-fold. For imbalanced data: use StratifiedKFold. Never validate on data used for training. Implementation: `sklearn.model_selection.cross_val_score(model, X, y, cv=5, scoring='f1')`.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Train-Test Split Best Practices\n\nStandard split: 80% train, 20% test. With validation: 60/20/20 or 70/15/15. Rules: (1) Split BEFORE any preprocessing, (2) Stratified split for classification, (3) Temporal split for time-series (older=train, newer=test), (4) Never use test set for hyperparameter tuning. Implementation: `train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)`.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Preprocessing Pipeline Order\n\nCorrect order: (1) Drop ID/constant columns, (2) Handle missing values, (3) Encode categoricals, (4) Scale numerics, (5) Feature engineering, (6) Feature selection. Use `sklearn.pipeline.Pipeline` to prevent data leakage. Each step is fit on training data only and transforms both train and test.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Data Leakage Prevention\n\nData leakage: when information from outside the training dataset is used to create the model. Common causes: (1) Using target column as feature, (2) Preprocessing before split, (3) Future data in training set, (4) Derived columns that include target info. Prevention: use Pipeline, temporal splits, feature importance analysis.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Model Selection by Problem Type\n\nClassification: (1) Logistic Regression (baseline), (2) Random Forest (robust), (3) XGBoost (high accuracy), (4) SVM (high-dimensional). Regression: (1) Linear Regression (baseline), (2) Random Forest Regressor, (3) XGBoost, (4) ElasticNet. Clustering: (1) K-Means, (2) DBSCAN, (3) Hierarchical. Start simple, add complexity only if needed.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Hyperparameter Tuning\n\nMethods: (1) GridSearchCV: exhaustive but slow, (2) RandomizedSearchCV: fast, good coverage, (3) BayesianOptimization (optuna): efficient for expensive models. Key hyperparameters: Random Forest (n_estimators, max_depth, min_samples_leaf), XGBoost (learning_rate, max_depth, n_estimators, subsample), Neural Network (learning_rate, layers, dropout).",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Feature Importance Analysis\n\nMethods: (1) Tree-based: `model.feature_importances_`, (2) Permutation importance: `sklearn.inspection.permutation_importance` (model-agnostic), (3) SHAP values: best for interpretability, (4) Correlation with target. Use permutation importance for reliable feature ranking. Drop features with importance < 0.01.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Metric Selection for Classification\n\nAccuracy: ONLY for balanced classes. Precision: when false positives are costly (spam detection). Recall: when false negatives are costly (cancer detection). F1: harmonic mean of precision/recall — default for imbalanced data. AUC-ROC: overall discriminative ability. PR-AUC: better than ROC-AUC for highly imbalanced data.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Metric Selection for Regression\n\nMSE/RMSE: penalizes large errors heavily. MAE: more robust to outliers than RMSE. R²: proportion of variance explained (0-1). MAPE: percentage-based, interpretable but undefined at y=0. For business: convert to currency impact whenever possible (e.g., 'RMSE of $1,250 means average prediction is off by $1,250').",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## Handling Multicollinearity\n\nDetection: (1) Correlation matrix (|r| > 0.85 is concerning), (2) VIF > 10 indicates multicollinearity. Treatment: (1) Drop one of the correlated pair, (2) PCA to combine into uncorrelated components, (3) Use regularization (L1/Lasso eliminates redundant features automatically), (4) Domain knowledge to choose which to keep.",
+      "source": "builtin_ml_practices",
+      "category": "ml_practices",
+      "url": ""
+    },
+    {
+      "text": "## GDPR Overview for Data Teams\n\nGDPR applies to EU citizen data regardless of where processing occurs. Key principles: (1) Lawful basis for processing, (2) Data minimization, (3) Purpose limitation, (4) Right to erasure, (5) Data portability, (6) 72-hour breach notification. For analytics: (1) Pseudonymize wherever possible, (2) Document processing activities, (3) Conduct Data Protection Impact Assessments.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## CCPA/CPRA Consumer Rights\n\nCCPA rights: (1) Right to know what data is collected, (2) Right to delete, (3) Right to opt-out of sale, (4) Right to non-discrimination. For data teams: maintain inventory of personal information, implement deletion requests within 45 days, provide access to data categories collected. Applies to businesses with >50K consumer records.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## SOX Compliance for Data\n\nSarbanes-Oxley requires documented controls for financial data. For data teams: (1) Audit trail on all data transformations, (2) Segregation of duties, (3) Data integrity controls, (4) Retention policies (usually 7 years), (5) Access controls. DataSoul's audit trail feature supports SOX compliance.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## Data Lineage Documentation\n\nData lineage tracks data from source to consumption: (1) Where data originated, (2) What transformations were applied, (3) Who/what modified it, (4) When changes occurred. Tools: Apache Atlas, OpenLineage, or custom metadata tables. Essential for: debugging data issues, compliance audits, impact analysis of schema changes.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## Data Retention Policies\n\nDefine how long data is kept: (1) Financial: 7 years (SOX), (2) Healthcare: 6-10 years (HIPAA), (3) HR: 3-7 years after employment, (4) Customer data: until consent withdrawn (GDPR). Implementation: automated archival/deletion scripts. For analytics: aggregate old data, delete PII, retain anonymized summaries.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## India DPDPA Compliance\n\nIndia's Digital Personal Data Protection Act 2023: (1) Consent-based processing, (2) Purpose limitation, (3) Data principal rights, (4) Data fiduciary obligations, (5) Cross-border transfer restrictions, (6) Significant data fiduciary obligations for large processors. Penalties: up to ₹250 Cr. Apply to: Aadhaar, PAN, phone numbers, email in Indian datasets.",
+      "source": "builtin_governance",
+      "category": "governance",
+      "url": ""
+    },
+    {
+      "text": "## Chi-Square Test of Independence\n\nTests whether two categorical variables are independent. Use when: comparing distributions across groups (e.g., payment method by region). Implementation: `from scipy.stats import chi2_contingency; stat, p, dof, expected = chi2_contingency(pd.crosstab(df['A'], df['B']))`. p < 0.05 → significant association.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## T-Test (Two-Sample)\n\nTests whether means of two groups differ significantly. Use when: comparing numeric variable across binary groups (e.g., salary by gender). Assumptions: approximately normal distributions, similar variances. Implementation: `scipy.stats.ttest_ind(group1, group2)`. Use Welch's t-test if variances are unequal: `equal_var=False`.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## ANOVA (One-Way)\n\nTests whether means differ across 3+ groups. Extension of t-test. Use when: comparing numeric variable across multiple categories (e.g., revenue by region). Implementation: `scipy.stats.f_oneway(group1, group2, group3)`. Follow-up: Tukey's HSD for pairwise comparisons. Non-parametric alternative: Kruskal-Wallis.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Mann-Whitney U Test\n\nNon-parametric alternative to t-test. Tests whether two distributions are identical. Use when: data is ordinal or non-normal. Implementation: `scipy.stats.mannwhitneyu(x, y, alternative='two-sided')`. More robust than t-test for skewed distributions.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Kolmogorov-Smirnov Test\n\nTests whether a sample comes from a specific distribution (one-sample) or whether two samples come from the same distribution (two-sample). Use for: distribution comparison, normality testing. Implementation: `scipy.stats.kstest(data, 'norm')`. More sensitive in the tails than other normality tests.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Granger Causality Test\n\nTests whether time-series X helps predict time-series Y (not true causality, but predictive). Use for: lead-lag relationships in time-series data. Implementation: `statsmodels.tsa.stattools.grangercausalitytests(data, maxlag=4)`. Requires: stationary time series. Pre-test with ADF test.",
+      "source": "builtin_statistics",
+      "category": "statistics",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Using Mean for Everything\n\nProblem: Mean is not robust. For right-skewed data (income, prices, durations), the mean is pulled toward outliers. Solution: Report median for skewed distributions, use trimmed mean for robust central tendency, check skewness first (|skew| > 1 → use median).",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Dropping All Missing Data\n\nProblem: Dropping rows with ANY missing value can lose >50% of data. If missingness is not random (MNAR), dropping introduces selection bias. Solution: (1) Analyze missing patterns first, (2) Use appropriate imputation, (3) Create missing indicators, (4) Only drop if <1% missing AND random.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: One-Hot Encoding High Cardinality\n\nProblem: One-hot encoding a column with 500 categories creates 500 new columns — causes memory issues and curse of dimensionality. Solution: (1) Target encoding, (2) Frequency encoding, (3) Hash encoding, (4) Group rare categories into 'Other', (5) Entity embeddings for deep learning.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Scaling Before Splitting\n\nProblem: If you fit StandardScaler on full dataset then split, the test set statistics have leaked into the scaler. Models appear better than they are. Solution: ALWAYS split first. Fit scaler on training data only. Transform both train and test with the training-fit scaler. Use Pipeline.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Ignoring Class Imbalance\n\nProblem: A model predicting 'no fraud' for every transaction achieves 99.9% accuracy — but catches zero fraud. Accuracy is meaningless for imbalanced classes. Solution: Use F1, PR-AUC as metrics. Apply SMOTE, class_weight='balanced', or cost-sensitive learning.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Using R² Alone for Regression\n\nProblem: R²=0.95 doesn't mean the model is good — it could still have massive errors on certain segments. Solution: (1) Plot residuals, (2) Check prediction intervals, (3) Report RMSE in business units (dollars, etc.), (4) Test on specific segments (not just overall).",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Not Checking for Data Leakage\n\nProblem: A feature that perfectly predicts the target (e.g., 'claim_paid' predicting 'claim_approved') likely contains future information. Models trained with leakage have unrealistic accuracy. Solution: (1) No target-derived features, (2) Temporal ordering, (3) Feature importance analysis — suspiciously high importance = investigate.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    },
+    {
+      "text": "## Antipattern: Treating All Nulls as Missing\n\nProblem: NULL can mean different things: (1) Unknown/missing, (2) Not applicable (e.g., spouse_name for single person), (3) Zero (e.g., discount=NULL means no discount), (4) System error. Solution: Investigate the semantics of NULL in each column. Different meanings require different treatments.",
+      "source": "builtin_antipatterns",
+      "category": "antipatterns",
+      "url": ""
+    }
+  ]
+}

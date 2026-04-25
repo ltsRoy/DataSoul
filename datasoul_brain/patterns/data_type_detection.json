@@ -1,0 +1,153 @@
+{
+  "category": "data_type_detection",
+  "description": "Patterns for automatically detecting and validating data types, mixed types, suspicious columns, and inconsistent formatting",
+  "type_detection_rules": [
+    {
+      "id": "dt_001",
+      "name": "Numeric Masquerading as String",
+      "detection": "Column dtype is 'object' BUT >80% of non-null values can be parsed as float/int",
+      "common_causes": ["Currency symbols ($, ₹, €)", "Comma separators (1,000)", "Percentage signs (%)", "Mixed N/A entries ('N/A', 'null', '-', '#REF!')"],
+      "recommended_fix": "Strip formatting characters → convert to float → handle unparseable as NaN",
+      "confidence": 0.93,
+      "example": "Column 'revenue' detected as string but 94% values are numeric with $ prefix. Stripped '$' and ',' → converted to float64. 6% unparseable values ('N/A', '-') treated as missing."
+    },
+    {
+      "id": "dt_002",
+      "name": "Date Masquerading as String",
+      "detection": "Column dtype is 'object' AND >60% values match common date patterns (MM/DD/YYYY, YYYY-MM-DD, DD-Mon-YY, etc.)",
+      "common_patterns": [
+        "YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY", "DD-Mon-YYYY",
+        "YYYY/MM/DD", "Mon DD, YYYY", "DD.MM.YYYY", "YYYYMMDD"
+      ],
+      "recommended_fix": "Identify dominant format → pd.to_datetime with format parameter → decompose into features",
+      "confidence": 0.88,
+      "example": "Column 'order_date' contains dates in 3 different formats (MM/DD/YYYY: 67%, DD/MM/YYYY: 28%, YYYY-MM-DD: 5%). Standardized to YYYY-MM-DD. ⚠️ 28% had DD/MM/YYYY — ambiguous dates like '03/04/2024' may be misinterpreted."
+    },
+    {
+      "id": "dt_003",
+      "name": "Mixed Date Formats",
+      "detection": "Date column has multiple formats or timezone inconsistencies",
+      "severity": "MEDIUM",
+      "impact": "Dates like '03/04/2024' are ambiguous — March 4th or April 3rd depending on locale. Wrong interpretation corrupts time-series analysis.",
+      "recommended_fix": "Identify locale context from other data → apply consistent parsing → flag ambiguous dates for review",
+      "confidence": 0.85,
+      "example": "⚠️ 'transaction_date' has ambiguous dates: 847 records where day/month could be swapped. Dates like '05/06/2024' are unparseable without locale context. Flagged for human review."
+    },
+    {
+      "id": "dt_004",
+      "name": "Boolean Masquerading as String",
+      "detection": "Column has ≤5 unique values AND values match boolean patterns",
+      "boolean_patterns": [
+        ["yes", "no"], ["true", "false"], ["1", "0"], ["y", "n"],
+        ["active", "inactive"], ["on", "off"], ["enabled", "disabled"],
+        ["male", "female"], ["pass", "fail"]
+      ],
+      "recommended_fix": "Map to boolean/binary (0/1) for ML readiness",
+      "confidence": 0.91,
+      "example": "Column 'is_active' contains ['Yes', 'No', 'yes', 'YES', 'N/A']. Standardized case → mapped Yes=1, No=0, N/A=NaN."
+    },
+    {
+      "id": "dt_005",
+      "name": "ID Column Detection",
+      "detection": "Column has unique values ≈ row count AND/OR name matches ID patterns",
+      "name_patterns": ["id", "key", "code", "number", "no.", "uuid", "guid", "pk", "index", "ref"],
+      "characteristics": ["high cardinality", "unique or near-unique", "often sequential or UUID format"],
+      "recommended_action": "Exclude from ML features. Keep as reference/join key only.",
+      "confidence": 0.94,
+      "example": "Column 'emp_code' identified as ID column (100% unique, sequential pattern). Excluded from feature set — IDs have no predictive power and cause overfitting."
+    }
+  ],
+  "suspicious_column_patterns": [
+    {
+      "id": "sc_001",
+      "name": "Constant Column",
+      "detection": "Column has only 1 unique value across all rows",
+      "severity": "LOW",
+      "action": "Drop — zero variance provides no information",
+      "example": "Column 'country' has value 'India' in all 5,000 rows. Dropped — provides no analytical value."
+    },
+    {
+      "id": "sc_002",
+      "name": "Near-Constant Column",
+      "detection": "Column has 1 dominant value appearing in >98% of rows",
+      "severity": "LOW",
+      "action": "Review — the rare values may be interesting anomalies or data errors",
+      "example": "Column 'currency' is 'INR' for 99.2% of records. The 0.8% 'USD' entries may be legitimate international transactions or data entry errors."
+    },
+    {
+      "id": "sc_003",
+      "name": "All-Unique Column (Possible Free Text or ID)",
+      "detection": "Column has unique values equal to row count AND is not detected as ID",
+      "severity": "MEDIUM",
+      "action": "Investigate — may be free text (addresses, comments) that needs NLP or should be dropped for ML",
+      "example": "Column 'comments' has 5,000 unique values across 5,000 rows. This appears to be free-text data — exclude from ML features unless NLP feature extraction is applied."
+    },
+    {
+      "id": "sc_004",
+      "name": "Column with Embedded Delimiters",
+      "detection": "String column where >20% of values contain commas, pipes, or semicolons",
+      "severity": "MEDIUM",
+      "action": "This column may contain multiple values packed into one field. Consider splitting into separate columns.",
+      "example": "Column 'tags' contains values like 'electronics,sale,featured'. Split into 3 boolean columns: 'tag_electronics', 'tag_sale', 'tag_featured'."
+    },
+    {
+      "id": "sc_005",
+      "name": "Suspiciously Correlated with Index",
+      "detection": "Numeric column has correlation >0.95 with row index",
+      "severity": "MEDIUM",
+      "action": "This column may be a sequential ID or auto-generated field masquerading as a feature. Verify business meaning.",
+      "example": "Column 'serial_no' has 0.99 correlation with row index. This is an auto-generated sequence, not a meaningful feature. Excluded from analysis."
+    }
+  ],
+  "inconsistent_formatting_patterns": [
+    {
+      "id": "if_001",
+      "name": "Inconsistent Case",
+      "detection": "String column has values that differ only in capitalization",
+      "examples": ["'Sales' vs 'sales' vs 'SALES'", "'New York' vs 'new york' vs 'NEW YORK'"],
+      "fix": "Apply consistent casing (title case for names, lowercase for codes)",
+      "impact": "Creates phantom categories in groupby operations"
+    },
+    {
+      "id": "if_002",
+      "name": "Leading/Trailing Whitespace",
+      "detection": "String values have spaces before or after actual content",
+      "examples": ["' Sales' vs 'Sales' vs 'Sales '"],
+      "fix": "str.strip() on all string columns",
+      "impact": "Invisible to users but causes failed joins and phantom categories"
+    },
+    {
+      "id": "if_003",
+      "name": "Inconsistent Null Representations",
+      "detection": "Column contains multiple different null/missing representations",
+      "null_variants": ["N/A", "n/a", "NA", "null", "NULL", "None", "none", "-", "--", ".", "?", "#N/A", "#REF!", "#VALUE!", "NaN", "nan", "missing", "unknown", "UNKNOWN", "0", "000", "99", "999", "-1", "TBD", "not available", "N.A."],
+      "fix": "Map all variants to proper NaN. CRITICAL: '0' and '-1' may be legitimate values — verify with domain context.",
+      "impact": "These remain invisible to pandas isnull() — they appear as valid data but are actually missing."
+    },
+    {
+      "id": "if_004",
+      "name": "Mixed Number Formats",
+      "detection": "Numeric column contains values with different decimal/thousand separators",
+      "examples": ["1,234.56 vs 1.234,56 (US vs European format)", "₹1,00,000 (Indian numbering) vs 100,000"],
+      "fix": "Detect dominant format → standardize → convert to float",
+      "impact": "Mixing formats causes values to be misinterpreted by 100x-1000x"
+    },
+    {
+      "id": "if_005",
+      "name": "Encoding Issues (Mojibake)",
+      "detection": "String column contains garbled characters (Ã¢, â€™, Ã©, etc.)",
+      "fix": "Re-read file with correct encoding (UTF-8, Latin-1, cp1252). Try ftfy library for automatic fix.",
+      "impact": "Customer names, addresses, and product names become unreadable"
+    }
+  ],
+  "cardinality_analysis": {
+    "description": "Rules for analyzing and acting on column cardinality",
+    "thresholds": {
+      "binary": { "unique_values": [1, 2], "action": "Label encode (0/1)" },
+      "low": { "unique_values": [3, 10], "action": "One-hot encode" },
+      "moderate": { "unique_values": [11, 50], "action": "Frequency or target encode" },
+      "high": { "unique_values": [51, 500], "action": "Target encode with regularization, or embeddings" },
+      "very_high": { "unique_values": [501, null], "action": "Hash encoding, or drop if not predictive. Consider if this is actually an ID column." }
+    }
+  }
+}

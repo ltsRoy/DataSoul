@@ -1,0 +1,57 @@
+{
+  "category": "real_estate_and_general_sectors",
+  "description": "Additional sector intelligence for Real Estate and General Business",
+  "sectors": [
+    {
+      "id": "sector_real_estate",
+      "name": "Real Estate & Property",
+      "detection_columns": ["property_id", "listing_id", "address", "city", "zipcode", "bedrooms", "bathrooms", "sqft", "square_feet", "lot_size", "listing_price", "sale_price", "price_per_sqft", "year_built", "property_type", "listing_date", "sold_date", "agent_id", "mls_number", "hoa_fee", "garage", "pool"],
+      "detection_confidence": 0.86,
+      "priority_metrics": ["Median Sale Price", "Price per Sq Ft", "Days on Market", "Inventory Level", "Sale-to-List Price Ratio", "Transaction Volume"],
+      "common_threats": [
+        "Duplicate listing IDs from multiple MLS systems",
+        "Inconsistent property types (SFH vs Single Family vs House)",
+        "Missing square footage affecting price-per-sqft calculations",
+        "Outlier prices from data entry errors or luxury properties",
+        "Stale listings (expired but not removed)"
+      ],
+      "insight_templates": [
+        "Median sale price is {median_price} with {direction} {pct}% {period}. Price per square foot: {price_per_sqft}.",
+        "Average days on market: {dom} days — {comparison} the market average of {benchmark} days. Properties priced above {threshold} sit {longer_pct}% longer.",
+        "Sale-to-list price ratio: {ratio}% — indicating a {market_type} market. {pct_above_asking}% of properties sold above asking price.",
+        "Inventory: {inventory_count} active listings. At current absorption rate, this represents {months_supply} months of supply ({supply_assessment}).",
+        "{stale_count} listings have been active for >{stale_days} days without price adjustment — potential stale inventory affecting market analysis."
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.05,
+        "duplicate_tolerance": 0.02,
+        "healthy_dom_range": [20, 60],
+        "balanced_market_months_supply": [4, 6]
+      }
+    },
+    {
+      "id": "sector_general",
+      "name": "General Business",
+      "detection_columns": [],
+      "detection_confidence": 0.50,
+      "priority_metrics": ["Record Count", "Completeness", "Duplicate Rate", "Data Health Score"],
+      "common_threats": [
+        "Missing values in key columns",
+        "Duplicate records",
+        "Inconsistent formatting",
+        "Mixed data types",
+        "PII exposure"
+      ],
+      "insight_templates": [
+        "Dataset contains {row_count} records across {col_count} dimensions. Data completeness: {completeness_pct}%.",
+        "Overall data health is {grade}: {health_summary}. The biggest opportunity for improvement is {top_improvement}.",
+        "{threat_count} data quality threats detected. Addressing these would improve your data confidence score from {before} to {after} (estimated).",
+        "Key statistics: {stat_summary}. DataSoul detected {pattern_count} actionable patterns in your data."
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.05,
+        "duplicate_tolerance": 0.02
+      }
+    }
+  ]
+}

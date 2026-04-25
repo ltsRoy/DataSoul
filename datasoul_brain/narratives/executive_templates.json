@@ -1,0 +1,147 @@
+{
+  "category": "executive_report_templates",
+  "description": "Templates for generating executive summaries, PPT slides, PDF reports, and boardroom-ready narratives",
+  "executive_summary_template": {
+    "structure": [
+      {
+        "section": "Company Snapshot",
+        "template": "Dataset contains {row_count} records across {col_count} dimensions, covering {date_range}. Detected sector: {sector}. Primary entity: {primary_entity} ({entity_count} unique).",
+        "ppt_slide": 1
+      },
+      {
+        "section": "Data Health Overview",
+        "template": "Overall Data Health Score: {health_score}/100 ({grade}). {critical_count} critical threats require immediate attention. Data completeness: {completeness_pct}%. Duplicate rate: {duplicate_pct}%. {privacy_warning}",
+        "ppt_slide": 2
+      },
+      {
+        "section": "Key Findings",
+        "template": "Top 3 findings:\n1. {finding_1}\n2. {finding_2}\n3. {finding_3}",
+        "ppt_slide": 3
+      },
+      {
+        "section": "Risks & Threats",
+        "template": "{threat_count} threats detected:\n• {critical_count} Critical: {critical_summary}\n• {medium_count} Medium: {medium_summary}\n• {low_count} Low: {low_summary}\n\nEstimated business impact if unaddressed: {risk_cost}",
+        "ppt_slide": 4
+      },
+      {
+        "section": "Growth Opportunities",
+        "template": "Data-driven opportunities identified:\n1. {opportunity_1} — estimated value: {opp_value_1}\n2. {opportunity_2} — estimated value: {opp_value_2}\n3. {opportunity_3} — estimated value: {opp_value_3}",
+        "ppt_slide": 5
+      },
+      {
+        "section": "Key Visualizations",
+        "template": "Charts: {chart_list}",
+        "charts": ["Distribution of key metrics", "Threat severity breakdown", "Quality score radar", "Trend analysis", "Correlation heatmap highlights"],
+        "ppt_slide": 6
+      },
+      {
+        "section": "30-Day Action Plan",
+        "template": "Week 1: {week1_actions}\nWeek 2: {week2_actions}\nWeek 3: {week3_actions}\nWeek 4: {week4_actions}\n\nExpected ROI: {roi_estimate}",
+        "ppt_slide": 7
+      }
+    ]
+  },
+  "storytelling_templates": {
+    "description": "Narrative templates that convert data findings into business stories",
+    "opening_hooks": [
+      "Your data tells a story of {theme} — here's what it's saying.",
+      "Underneath {row_count} rows of data lies a {severity} pattern that could {impact}.",
+      "If this dataset could talk, it would warn you about {top_threat} and celebrate {top_strength}.",
+      "The numbers don't lie: {headline_metric} reveals both a {risk} and a {opportunity}."
+    ],
+    "sector_narratives": {
+      "retail": {
+        "growth_story": "Revenue {direction} {pct}% {period}, driven by {driver}. The {top_segment} segment shows the strongest momentum, contributing {contribution_pct}% of growth. However, {risk_segment} shows signs of {risk_pattern}, requiring {action}.",
+        "efficiency_story": "Your inventory efficiency tells two stories: top-performing SKUs turn over every {fast_turnover} days, while {slow_pct}% of products sit unsold for {slow_days}+ days, locking up an estimated {capital_tied} in working capital.",
+        "customer_story": "Customer data reveals {segment_count} distinct behavior segments. The {best_segment} segment (representing {best_pct}% of customers) generates {revenue_pct}% of revenue. Retention focus on this segment alone could protect {protection_value} in annual revenue."
+      },
+      "healthcare": {
+        "quality_story": "Patient outcomes data across {patient_count} records reveals a {readmit_pct}% readmission rate, with {department} showing the highest risk. The average length of stay varies by {los_variation} days between departments, suggesting inconsistent discharge protocols.",
+        "safety_story": "⚠️ {duplicate_patients} potential duplicate patient records pose a direct safety risk. In healthcare systems, duplicate records are linked to {risk_count}% of medication errors and adverse events."
+      },
+      "finance": {
+        "compliance_story": "Financial data integrity analysis: {completeness_pct}% transaction completeness with {gap_count} unexplained gaps in the ledger. {suspicious_count} transactions flagged for anomaly patterns consistent with {anomaly_type}.",
+        "performance_story": "Portfolio analysis shows {return_direction} returns of {return_pct}% {period}. Risk concentration: {concentration_pct}% of exposure is in {top_sector}. Diversification score: {diversification}/100."
+      },
+      "hr": {
+        "retention_story": "Your workforce data paints a clear picture: {attrition_pct}% attrition driven primarily by {top_cause}. The cost of turnover at your scale is approximately {turnover_cost} annually. The highest-risk cohort is {risk_cohort} with {cohort_attrition_pct}% attrition.",
+        "compensation_story": "Salary analysis reveals {inequity_type} across {dimension}: {group_a} earns {gap_pct}% {more_less} than {group_b} for comparable roles. Addressing this gap would affect {affected_count} employees."
+      }
+    },
+    "closing_templates": [
+      "Cleaning this dataset with DataSoul is projected to save {hours} analyst hours annually, equivalent to {savings} in productivity gains.",
+      "By addressing the {critical_count} critical threats identified, you reduce decision risk by an estimated {risk_reduction}% and improve data confidence from {before_score} to {after_score}.",
+      "The path from raw data to trusted intelligence starts with these {action_count} actions. DataSoul can execute {automated_pct}% of them automatically — the remaining {manual_pct}% require your domain expertise and approval."
+    ]
+  },
+  "roi_calculation_templates": {
+    "hours_saved": {
+      "formula": "estimated_manual_cleaning_hours × hourly_analyst_rate",
+      "default_hourly_rate": 2500,
+      "estimation_rules": [
+        "1 column with missing values → 0.5 hours manual review",
+        "1 duplicate detection and resolution pass → 2 hours",
+        "1 inconsistent category cleanup → 1 hour per 10 variations",
+        "Full data profiling → 4-8 hours manually, 30 seconds with DataSoul",
+        "Report generation → 8-16 hours manually, instant with DataSoul"
+      ]
+    },
+    "error_reduction": {
+      "formula": "decision_errors_avoided × average_cost_per_error",
+      "industry_averages": {
+        "retail": { "cost_per_error": 5000, "errors_per_quarter": 12 },
+        "healthcare": { "cost_per_error": 25000, "errors_per_quarter": 4 },
+        "finance": { "cost_per_error": 50000, "errors_per_quarter": 6 },
+        "hr": { "cost_per_error": 15000, "errors_per_quarter": 8 }
+      }
+    },
+    "quality_improvement": {
+      "formula": "(after_health_score - before_health_score) / before_health_score × 100",
+      "typical_improvement": "15-40% health score improvement after DataSoul pipeline"
+    }
+  },
+  "ppt_slide_templates": {
+    "slide_1_snapshot": {
+      "title": "Company Data Snapshot",
+      "layout": "title_with_stats",
+      "content": ["Dataset size", "Date range", "Detected sector", "Primary entities", "Data sources"],
+      "visual": "Summary stats in large numbers with icons"
+    },
+    "slide_2_health": {
+      "title": "Data Health Assessment",
+      "layout": "score_with_radar",
+      "content": ["Health Score (large number)", "AI Confidence Radar chart", "Grade (A+ to F)", "Improvement potential"],
+      "visual": "Circular health score gauge + radar chart"
+    },
+    "slide_3_findings": {
+      "title": "Key Findings",
+      "layout": "three_column_cards",
+      "content": ["Finding 1 with icon", "Finding 2 with icon", "Finding 3 with icon"],
+      "visual": "Three cards with emoji/icons and brief descriptions"
+    },
+    "slide_4_risks": {
+      "title": "Risk & Threat Analysis",
+      "layout": "threat_matrix",
+      "content": ["Critical threats (red cards)", "Medium threats (amber cards)", "Low threats (green cards)", "Total business impact"],
+      "visual": "Color-coded threat cards with severity indicators"
+    },
+    "slide_5_opportunities": {
+      "title": "Data-Driven Opportunities",
+      "layout": "opportunity_list",
+      "content": ["Top 3 opportunities with estimated values", "Quick wins vs strategic initiatives"],
+      "visual": "Opportunity cards with dollar/rupee values and impact arrows"
+    },
+    "slide_6_charts": {
+      "title": "Key Visualizations",
+      "layout": "chart_grid",
+      "content": ["Distribution chart", "Trend line", "Correlation highlight", "Anomaly detection"],
+      "visual": "2×2 grid of charts"
+    },
+    "slide_7_action_plan": {
+      "title": "30-Day Action Plan",
+      "layout": "timeline",
+      "content": ["Week 1-4 actions", "Owner assignments", "Expected ROI", "DataSoul can automate X%"],
+      "visual": "Horizontal timeline with weekly milestones"
+    }
+  }
+}

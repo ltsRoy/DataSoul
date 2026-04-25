@@ -1,0 +1,84 @@
+{
+  "category": "industry_benchmarks",
+  "description": "Comparative benchmarks for data quality across industries",
+  "quality_dimensions": {
+    "completeness": {
+      "description": "Percentage of non-null values in critical fields",
+      "benchmarks": {
+        "healthcare": { "excellent": 0.99, "good": 0.97, "acceptable": 0.95, "poor": 0.90 },
+        "finance": { "excellent": 0.995, "good": 0.98, "acceptable": 0.95, "poor": 0.90 },
+        "retail": { "excellent": 0.97, "good": 0.93, "acceptable": 0.90, "poor": 0.85 },
+        "hr": { "excellent": 0.98, "good": 0.95, "acceptable": 0.92, "poor": 0.85 },
+        "manufacturing": { "excellent": 0.98, "good": 0.95, "acceptable": 0.92, "poor": 0.88 },
+        "education": { "excellent": 0.97, "good": 0.93, "acceptable": 0.90, "poor": 0.85 },
+        "logistics": { "excellent": 0.98, "good": 0.95, "acceptable": 0.92, "poor": 0.87 },
+        "general": { "excellent": 0.97, "good": 0.93, "acceptable": 0.90, "poor": 0.85 }
+      }
+    },
+    "uniqueness": {
+      "description": "Percentage of records that are unique (non-duplicate)",
+      "benchmarks": {
+        "healthcare": { "excellent": 0.999, "good": 0.998, "acceptable": 0.995, "poor": 0.99 },
+        "finance": { "excellent": 0.999, "good": 0.997, "acceptable": 0.995, "poor": 0.99 },
+        "retail": { "excellent": 0.99, "good": 0.98, "acceptable": 0.97, "poor": 0.95 },
+        "hr": { "excellent": 0.998, "good": 0.995, "acceptable": 0.99, "poor": 0.98 },
+        "manufacturing": { "excellent": 0.995, "good": 0.99, "acceptable": 0.98, "poor": 0.97 },
+        "general": { "excellent": 0.99, "good": 0.98, "acceptable": 0.97, "poor": 0.95 }
+      }
+    },
+    "consistency": {
+      "description": "Percentage of values conforming to expected format and constraints",
+      "benchmarks": {
+        "healthcare": { "excellent": 0.99, "good": 0.97, "acceptable": 0.95, "poor": 0.90 },
+        "finance": { "excellent": 0.995, "good": 0.98, "acceptable": 0.96, "poor": 0.92 },
+        "retail": { "excellent": 0.97, "good": 0.94, "acceptable": 0.91, "poor": 0.85 },
+        "general": { "excellent": 0.97, "good": 0.94, "acceptable": 0.91, "poor": 0.85 }
+      }
+    },
+    "timeliness": {
+      "description": "Data recency — how fresh the most recent records are",
+      "benchmarks_days": {
+        "healthcare": { "excellent": 1, "good": 3, "acceptable": 7, "poor": 30 },
+        "finance": { "excellent": 1, "good": 1, "acceptable": 3, "poor": 7 },
+        "retail": { "excellent": 1, "good": 7, "acceptable": 14, "poor": 30 },
+        "manufacturing": { "excellent": 1, "good": 1, "acceptable": 7, "poor": 14 },
+        "general": { "excellent": 7, "good": 14, "acceptable": 30, "poor": 90 }
+      }
+    }
+  },
+  "cost_of_bad_data": {
+    "description": "Industry research on the financial impact of poor data quality",
+    "statistics": [
+      "IBM estimates poor data quality costs US businesses $3.1 trillion annually",
+      "Gartner reports organizations believe poor data quality costs an average of $12.9 million per year",
+      "Harvard Business Review: knowledge workers spend 50% of their time dealing with data quality issues",
+      "McKinsey: data scientists spend 60% of their time cleaning data instead of analyzing it",
+      "1-10-100 Rule: $1 to verify, $10 to clean, $100 to deal with mistakes from bad data"
+    ],
+    "roi_formulas": {
+      "hours_saved": "analyst_hours_per_week_on_cleaning * 52 * hourly_rate",
+      "error_reduction_savings": "decision_errors_per_year * avg_cost_per_error * reduction_percentage",
+      "compliance_risk_reduction": "potential_fine_amount * probability_reduction",
+      "productivity_gain": "total_analyst_count * time_saved_percentage * avg_annual_salary"
+    }
+  },
+  "scoring_algorithm": {
+    "description": "How DataSoul calculates the overall Data Health Score (0-100)",
+    "components": [
+      { "dimension": "Completeness", "weight": 0.25, "formula": "avg(non_null_rate for all columns)" },
+      { "dimension": "Uniqueness", "weight": 0.20, "formula": "1 - (duplicate_rows / total_rows)" },
+      { "dimension": "Consistency", "weight": 0.20, "formula": "avg(format_conformity_rate for all columns)" },
+      { "dimension": "Validity", "weight": 0.15, "formula": "avg(valid_value_rate for all columns)" },
+      { "dimension": "Accuracy", "weight": 0.10, "formula": "1 - (outlier_rate + invalid_rate)" },
+      { "dimension": "Timeliness", "weight": 0.10, "formula": "recency_score based on most_recent_date" }
+    ],
+    "grade_thresholds": {
+      "A+ (Excellent)": [95, 100],
+      "A (Very Good)": [85, 94],
+      "B (Good)": [70, 84],
+      "C (Needs Work)": [50, 69],
+      "D (Poor)": [30, 49],
+      "F (Critical)": [0, 29]
+    }
+  }
+}

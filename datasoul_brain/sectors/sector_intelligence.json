@@ -1,0 +1,213 @@
+{
+  "category": "sector_intelligence",
+  "description": "Sector detection rules and industry-specific insights for DataSoul AI Brain",
+  "sectors": [
+    {
+      "id": "sector_retail",
+      "name": "Retail & E-Commerce",
+      "detection_columns": ["sku", "product_id", "product_name", "inventory", "stock", "order_id", "cart", "quantity", "unit_price", "discount", "category", "subcategory", "brand", "store_id", "warehouse"],
+      "detection_confidence": 0.85,
+      "priority_metrics": ["Revenue", "Average Order Value", "Units Sold", "Inventory Turnover", "Customer Lifetime Value", "Cart Abandonment Rate"],
+      "common_threats": [
+        "Duplicate order IDs inflating revenue",
+        "Zero-movement SKUs tying up working capital",
+        "Inconsistent product categories fragmenting analytics",
+        "Missing inventory levels causing stockout blind spots",
+        "Price outliers from data entry errors"
+      ],
+      "insight_templates": [
+        "Revenue {direction} {pct}% in {period} led by {top_category} sales, but {zero_movement_pct}% of SKUs had zero movement, tying up {working_capital} in dead stock.",
+        "Top {top_n} products account for {revenue_pct}% of revenue — classic Pareto distribution. Consider focusing inventory investment on these {top_n} items.",
+        "Average order value varies {aov_variance}% across {dimension} — standardizing pricing strategy could capture an additional {opportunity} in revenue.",
+        "{discount_pct}% of orders had discounts applied, averaging {avg_discount}%. Excessive discounting may be eroding margins by {margin_erosion}.",
+        "Inventory turnover is {turnover} days, {comparison} to the retail industry average of 30-45 days. {recommendation}"
+      ],
+      "kpi_formulas": {
+        "Average Order Value": "total_revenue / total_orders",
+        "Inventory Turnover": "cost_of_goods_sold / average_inventory",
+        "Dead Stock Rate": "zero_movement_skus / total_skus * 100",
+        "Discount Penetration": "discounted_orders / total_orders * 100"
+      },
+      "benchmarks": {
+        "missing_value_tolerance": 0.05,
+        "duplicate_tolerance": 0.02,
+        "acceptable_discount_rate": 0.25,
+        "healthy_inventory_turnover_days": [30, 45]
+      }
+    },
+    {
+      "id": "sector_healthcare",
+      "name": "Healthcare",
+      "detection_columns": ["patient_id", "patient_name", "diagnosis", "icd_code", "procedure", "admission_date", "discharge_date", "bed_number", "doctor_id", "physician", "lab_result", "medication", "dosage", "blood_type", "vitals", "bmi", "symptoms", "treatment"],
+      "detection_confidence": 0.90,
+      "priority_metrics": ["Patient Volume", "Average Length of Stay", "Readmission Rate", "Bed Occupancy Rate", "Treatment Outcomes", "Cost per Patient"],
+      "common_threats": [
+        "Duplicate patient records (catastrophic for treatment safety)",
+        "Missing diagnosis codes affecting billing accuracy",
+        "Inconsistent medication names risking drug interaction analysis",
+        "PII exposure (patient names, SSNs in analytics data)",
+        "Stale discharge data affecting bed management"
+      ],
+      "insight_templates": [
+        "Average length of stay is {avg_los} days, {comparison} the healthcare benchmark of {benchmark} days for {department}.",
+        "Readmission rate of {readmit_pct}% detected — {count} patients readmitted within 30 days. This exceeds the CMS benchmark of 15.6%.",
+        "{missing_diagnosis_pct}% of records have missing diagnosis codes, potentially affecting ${billing_impact} in reimbursements.",
+        "⚠️ {duplicate_patients} duplicate patient records detected — this is a patient safety risk. Duplicate records can lead to wrong treatments, missed allergies, and medication errors.",
+        "Bed occupancy is at {occupancy_pct}% — {occupancy_assessment}. Target range is 75-85% for optimal patient care and resource utilization."
+      ],
+      "compliance_notes": [
+        "HIPAA compliance requires all patient PII to be de-identified before analysis",
+        "Minimum Necessary Standard: only include data elements necessary for the analysis purpose",
+        "Audit trail required for all data access and transformations on patient data"
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.02,
+        "duplicate_tolerance": 0.001,
+        "avg_length_of_stay_days": 4.5,
+        "readmission_rate_benchmark": 0.156,
+        "bed_occupancy_target": [0.75, 0.85]
+      }
+    },
+    {
+      "id": "sector_finance",
+      "name": "Finance & Banking",
+      "detection_columns": ["account_id", "account_number", "transaction_id", "transaction_amount", "balance", "interest_rate", "loan_amount", "credit_score", "invoice_total", "payment_date", "due_date", "debit", "credit", "ledger", "gl_code", "portfolio", "ticker", "settlement_date"],
+      "detection_confidence": 0.88,
+      "priority_metrics": ["Total Revenue", "Net Profit Margin", "Outstanding Receivables", "Cash Flow", "Default Rate", "Customer Acquisition Cost"],
+      "common_threats": [
+        "Duplicate transactions inflating revenue/costs",
+        "Missing payment dates affecting aging reports",
+        "Broken invoice chains disrupting audit trails",
+        "Negative balance anomalies indicating data errors or fraud",
+        "Credit score outliers from data quality issues"
+      ],
+      "insight_templates": [
+        "Outstanding receivables total {amount} with {overdue_pct}% past due. Aging analysis shows {aging_30} in 30-day, {aging_60} in 60-day, {aging_90} in 90-day buckets.",
+        "Default rate of {default_pct}% detected across {count} accounts — {comparison} to the industry average of {benchmark}%.",
+        "{duplicate_txn_count} duplicate transactions detected totaling {duplicate_amount} — these may inflate revenue by {inflation_pct}%.",
+        "Cash flow pattern shows {pattern} — {count} gaps in monthly data suggest incomplete transaction capture affecting financial forecasting.",
+        "Invoice completeness is {completeness_pct}% — {missing_count} invoices missing key fields (amount, date, or vendor), potentially affecting tax compliance."
+      ],
+      "compliance_notes": [
+        "SOX compliance requires complete audit trail of all financial data transformations",
+        "PCI-DSS: credit card numbers must NEVER appear in analytics datasets",
+        "All financial data transformations must be reversible and documented"
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.01,
+        "duplicate_tolerance": 0.005,
+        "transaction_completeness": 0.99,
+        "receivables_overdue_threshold": 0.10
+      }
+    },
+    {
+      "id": "sector_hr",
+      "name": "Human Resources",
+      "detection_columns": ["employee_id", "emp_id", "employee_name", "department", "designation", "salary", "hire_date", "termination_date", "performance_rating", "manager_id", "leave_balance", "attendance", "training_hours", "attrition", "job_level", "years_at_company", "monthly_income"],
+      "detection_confidence": 0.87,
+      "priority_metrics": ["Headcount", "Attrition Rate", "Average Salary", "Time to Fill", "Training Hours per Employee", "Performance Distribution"],
+      "common_threats": [
+        "Duplicate employee records inflating headcount and payroll",
+        "Missing performance ratings skewing talent reviews",
+        "Salary outliers from data entry or inconsistent currency",
+        "PII exposure (SSN, personal addresses in analytics data)",
+        "Inconsistent department names fragmenting org analysis"
+      ],
+      "insight_templates": [
+        "Attrition rate is {attrition_pct}% ({count} departures in {period}) — {comparison} the HR industry average of 10-15%.",
+        "Salary distribution is {skewness_desc} with median {median_salary} vs mean {mean_salary} — executive compensation pulls the mean up by {pull_pct}%.",
+        "Average tenure is {tenure} years. {short_tenure_pct}% of employees have been with the company less than 1 year — potential onboarding retention issue.",
+        "Performance rating distribution: {pct_high}% high, {pct_mid}% meets expectations, {pct_low}% needs improvement — {distribution_assessment}.",
+        "{dept_count} department name variations detected (e.g., 'Engineering', 'engineering', 'Eng') — standardizing would improve org chart accuracy."
+      ],
+      "compliance_notes": [
+        "Salary data is highly sensitive — ensure access controls are in place",
+        "Performance data requires consent for analysis in many jurisdictions",
+        "Employee data processing must comply with local labor laws"
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.03,
+        "duplicate_tolerance": 0.005,
+        "healthy_attrition_rate": [0.10, 0.15],
+        "performance_rating_completeness": 0.95
+      }
+    },
+    {
+      "id": "sector_manufacturing",
+      "name": "Manufacturing & IoT",
+      "detection_columns": ["machine_id", "production_line", "batch_number", "defect_rate", "downtime", "oee", "cycle_time", "yield", "sensor_reading", "temperature", "pressure", "vibration", "maintenance_date", "shift", "operator_id", "quality_score"],
+      "detection_confidence": 0.86,
+      "priority_metrics": ["OEE (Overall Equipment Effectiveness)", "Defect Rate", "Downtime Hours", "Production Volume", "Yield Rate", "MTBF (Mean Time Between Failures)"],
+      "common_threats": [
+        "Sensor noise spikes creating false quality alerts",
+        "Missing production records during shift changes",
+        "Machine ID inconsistencies between systems",
+        "Duplicate batch records affecting quality traceability",
+        "Stale maintenance records risking equipment failure"
+      ],
+      "insight_templates": [
+        "Overall Equipment Effectiveness (OEE) is {oee_pct}% — {comparison} the world-class benchmark of 85%. Availability: {availability}%, Performance: {performance}%, Quality: {quality}%.",
+        "Defect rate is {defect_pct}% with {top_defect} being the most common defect type ({defect_share}% of all defects).",
+        "Machine {machine_id} shows {anomaly_count} sensor anomalies in the last {period} — potential early warning of equipment failure.",
+        "Production downtime totals {downtime_hours} hours in {period}, with {top_cause} accounting for {cause_pct}% of all downtime.",
+        "Yield rate of {yield_pct}% means {waste_pct}% of raw materials are wasted — optimizing {top_waste_process} could save {savings}."
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.03,
+        "duplicate_tolerance": 0.01,
+        "world_class_oee": 0.85,
+        "acceptable_defect_rate": 0.02,
+        "sensor_noise_tolerance": 0.01
+      }
+    },
+    {
+      "id": "sector_education",
+      "name": "Education",
+      "detection_columns": ["student_id", "enrollment_id", "course_id", "grade", "gpa", "attendance_rate", "semester", "faculty_id", "credits", "graduation_date", "major", "test_score", "scholarship"],
+      "detection_confidence": 0.84,
+      "priority_metrics": ["Enrollment Count", "Average GPA", "Graduation Rate", "Attendance Rate", "Drop-out Rate", "Course Completion Rate"],
+      "insight_templates": [
+        "Average GPA is {avg_gpa} with {low_gpa_pct}% of students below 2.0 — targeted intervention could improve retention.",
+        "Attendance rate of {attendance_pct}% — students with <75% attendance have {correlation} lower GPAs on average.",
+        "Drop-out rate is {dropout_pct}% with {top_semester} being the highest risk period ({semester_pct}% of all dropouts).",
+        "Course completion rate is {completion_pct}% — {bottom_courses} courses have completion rates below 60%, suggesting curriculum or teaching challenges."
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.05,
+        "duplicate_tolerance": 0.01,
+        "healthy_graduation_rate": 0.85,
+        "attendance_threshold": 0.75
+      }
+    },
+    {
+      "id": "sector_logistics",
+      "name": "Logistics & Supply Chain",
+      "detection_columns": ["shipment_id", "tracking_number", "origin", "destination", "carrier", "delivery_date", "estimated_delivery", "freight_cost", "weight", "volume", "route", "warehouse_id", "supplier_id", "lead_time", "transit_time"],
+      "detection_confidence": 0.85,
+      "priority_metrics": ["On-Time Delivery Rate", "Average Transit Time", "Freight Cost per Unit", "Order Accuracy", "Inventory Accuracy", "Supplier Lead Time"],
+      "insight_templates": [
+        "On-time delivery rate is {otd_pct}% — {comparison} the industry benchmark of 95%. {late_count} shipments were {avg_delay} days late on average.",
+        "Average transit time is {transit_days} days with {variance_pct}% variance — {top_route} has the most inconsistent delivery times.",
+        "Freight cost per unit is {cost_per_unit} with {carrier} being the most cost-effective carrier ({savings_vs_avg} vs average).",
+        "Supplier {supplier} has a lead time of {lead_time} days — {comparison} the average of {avg_lead_time} days. Consider diversifying supply sources."
+      ],
+      "benchmarks": {
+        "missing_value_tolerance": 0.03,
+        "duplicate_tolerance": 0.01,
+        "on_time_delivery_benchmark": 0.95,
+        "inventory_accuracy_target": 0.97
+      }
+    }
+  ],
+  "sector_detection_algorithm": {
+    "method": "Column name matching with weighted scoring",
+    "steps": [
+      "1. Lowercase all column names and remove underscores/spaces",
+      "2. For each sector, count how many detection_columns match (fuzzy match > 80%)",
+      "3. Calculate match_score = matches / total_columns * detection_confidence",
+      "4. Select sector with highest match_score above threshold (0.15)",
+      "5. If no sector exceeds threshold, classify as 'General Business'",
+      "6. If multiple sectors tie, use the one with higher detection_confidence"
+    ]
+  }
+}

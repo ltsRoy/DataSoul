@@ -1,0 +1,80 @@
+{
+  "category": "correlation_analysis",
+  "description": "Patterns for detecting and interpreting correlations, including business impact and leakage risks",
+  "correlation_patterns": [
+    {
+      "id": "corr_001",
+      "name": "Near-Perfect Positive Correlation",
+      "range": [0.95, 1.0],
+      "severity": "CRITICAL",
+      "interpretation": "These features are essentially duplicates — one can be predicted almost perfectly from the other.",
+      "possible_causes": ["One is derived from the other (total = quantity × price)", "Same metric in different units (kg vs lbs)", "Data entry artifact (same source column copied)", "Target leakage (feature encodes the outcome)"],
+      "action": "Drop one. If one might be target leakage, investigate immediately. Keep the more interpretable feature.",
+      "business_impact": "Redundant features inflate model complexity and can cause unstable coefficients in linear models.",
+      "example": "Correlation between 'total_amount' and 'subtotal_after_tax' is 0.98 — 'total_amount' appears to be derived from 'subtotal'. Keeping 'subtotal_after_tax' as the primary feature."
+    },
+    {
+      "id": "corr_002",
+      "name": "Strong Positive Correlation",
+      "range": [0.70, 0.95],
+      "severity": "MEDIUM",
+      "interpretation": "Strong linear relationship but not perfectly redundant. May share underlying cause.",
+      "action": "Keep both but flag as correlated pair. Consider PCA or feature selection if model is linear.",
+      "example": "Age and years_at_company have correlation 0.72 — naturally correlated (older employees tend to have longer tenure). Both provide value but should be monitored for multicollinearity."
+    },
+    {
+      "id": "corr_003",
+      "name": "Moderate Correlation",
+      "range": [0.40, 0.70],
+      "severity": "LOW",
+      "interpretation": "Meaningful relationship exists but features capture different aspects. Usually safe to keep both.",
+      "action": "No action needed. Note the relationship for business insights.",
+      "example": "Income and education_level have correlation 0.55 — expected relationship that provides useful context for segment analysis."
+    },
+    {
+      "id": "corr_004",
+      "name": "Unexpected Zero Correlation",
+      "range": [-0.05, 0.05],
+      "severity": "MEDIUM",
+      "interpretation": "Features that SHOULD be correlated but aren't — this may indicate data quality issues or non-linear relationships.",
+      "detection": "Domain knowledge suggests correlation should exist (e.g., sales vs marketing spend)",
+      "action": "Investigate: check for data errors, non-linear relationships, confounding variables, or segmented effects.",
+      "example": "⚠️ Marketing_spend and revenue show near-zero correlation (0.03) — this is suspicious. Investigation reveals: marketing data is lagged by 2 months, masking the true relationship."
+    },
+    {
+      "id": "corr_005",
+      "name": "Suspicious Correlation with Target (Leakage Risk)",
+      "range": [0.90, 1.0],
+      "severity": "CRITICAL",
+      "interpretation": "Feature correlates too strongly with the target variable — almost certainly leakage or derivation.",
+      "detection": "abs(correlation_with_target) > 0.90",
+      "action": "IMMEDIATELY investigate. Check if this feature is available at prediction time. If not → remove immediately.",
+      "example": "⚠️ CRITICAL LEAKAGE RISK: Feature 'account_status' has 0.94 correlation with target 'churn'. Investigation: 'account_status' is set to 'cancelled' AFTER churn happens — this IS the target, not a predictor."
+    },
+    {
+      "id": "corr_006",
+      "name": "Strong Negative Correlation",
+      "range": [-1.0, -0.70],
+      "severity": "MEDIUM",
+      "interpretation": "Inverse relationship — as one increases, the other decreases. May indicate complementary features.",
+      "action": "Verify the relationship makes domain sense. If one is the inverse of the other (satisfaction vs complaints), consider dropping one.",
+      "example": "Customer_satisfaction and complaint_count have correlation -0.78 — logically consistent inverse relationship. Keep both; they provide different operational perspectives."
+    }
+  ],
+  "heatmap_interpretation_guide": {
+    "how_to_read": "The correlation heatmap shows pairwise Pearson correlation coefficients between all numeric features. Values range from -1 (perfect negative) to +1 (perfect positive). 0 means no linear relationship.",
+    "color_guide": {
+      "dark_red": "Strong positive (>0.7) — features move together",
+      "light_red": "Moderate positive (0.4-0.7) — some relationship",
+      "white": "Near zero (±0.2) — no linear relationship",
+      "light_blue": "Moderate negative (-0.4 to -0.7) — inverse relationship",
+      "dark_blue": "Strong negative (<-0.7) — features move opposite"
+    },
+    "what_to_look_for": [
+      "Bright red blocks off-diagonal → redundant feature pairs to investigate",
+      "Bright red in the target column → strong predictors (or leakage risks)",
+      "Bright blue in the target column → inverse predictors",
+      "White rows/columns → features with no linear relationships (may still have non-linear ones)"
+    ]
+  }
+}
