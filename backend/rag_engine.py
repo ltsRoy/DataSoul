@@ -458,3 +458,15 @@ class RAGEngine:
     @staticmethod
     def _make_id(text: str) -> str:
         return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+
+# ─── Singleton instance ───
+_rag_instance: RAGEngine | None = None
+
+
+def get_rag() -> RAGEngine:
+    """Get the shared RAGEngine singleton — avoids duplicate ChromaDB clients."""
+    global _rag_instance
+    if _rag_instance is None:
+        _rag_instance = RAGEngine()
+    return _rag_instance

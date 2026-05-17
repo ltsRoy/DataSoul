@@ -23,7 +23,7 @@ from threat_detector import ThreatDetector
 from sector_detector import SectorDetector
 from strategy_engine import StrategyEngine
 from narrative_engine import NarrativeEngine
-from rag_engine import RAGEngine
+from rag_engine import RAGEngine, get_rag
 from knowledge_scraper import KnowledgeScraper
 from pipeline_engine import IterativePipeline
 from llm_engine import get_llm
@@ -40,7 +40,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

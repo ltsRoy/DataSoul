@@ -12,7 +12,7 @@ from typing import Optional
 from collections import Counter
 
 from llm_engine import get_llm
-from rag_engine import RAGEngine
+from rag_engine import get_rag
 
 MOJIBAKE_MAP = {
     "\u00e2\u0080\u0099": "'", "\u00e2\u0080\u009c": '"', "\u00e2\u0080\u009d": '"',
@@ -33,7 +33,7 @@ class CSVCorrector:
 
     def __init__(self):
         self._llm = get_llm()
-        self._rag = RAGEngine()
+        self._rag = get_rag()
 
     # ═══ PUBLIC API ═══
 

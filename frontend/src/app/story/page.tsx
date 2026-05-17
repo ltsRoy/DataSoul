@@ -55,6 +55,7 @@ function StoryPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [llmStatus, setLlmStatus] = useState<LLMStatusResponse | null>(null);
+  const [llmPowered, setLlmPowered] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamDone, setStreamDone] = useState(false);
   const narrativeRef = useRef<HTMLDivElement>(null);
@@ -95,23 +96,37 @@ function StoryPageContent() {
           setIsStreaming(true);
           setStreamDone(false);
           setNarrative("");
+          setLlmPowered(true);
+
+          let currentNarrative = "";
 
           await streamStory(
             sessionId!,
             (token) => {
-              setNarrative((prev) => prev + token);
+              currentNarrative += token;
+              setNarrative(currentNarrative);
             },
             () => {
               setIsStreaming(false);
               setStreamDone(true);
+              if (currentNarrative.length === 0) {
+                 // Fallback if empty stream
+                 setLlmPowered(false);
+                 getStory(sessionId!).then((d) => {
+                   setNarrative(d.story);
+                   setLlmPowered(d.llm_powered || false);
+                 }).catch((e) => setError(e.message));
+              }
             },
             (err) => {
               console.warn("[Story] Stream failed, falling back:", err);
               setIsStreaming(false);
+              setLlmPowered(false);
               // Fall back to non-streaming
               getStory(sessionId!).then((d) => {
                 setNarrative(d.story);
                 setStreamDone(true);
+                setLlmPowered(d.llm_powered || false);
               }).catch((e) => setError(e.message));
             },
           );
@@ -119,6 +134,7 @@ function StoryPageContent() {
           // Template mode — get full story at once
           const storyData = await getStory(sessionId!);
           setNarrative(storyData.story);
+          setLlmPowered(storyData.llm_powered || false);
           setStreamDone(true);
         }
       } catch (err) {
@@ -131,15 +147,15 @@ function StoryPageContent() {
   }, [sessionId]);
 
   // Typewriter only used for template mode (non-streaming)
-  const useStreamMode = llmStatus?.available && !streamDone && isStreaming;
+  const useStreamMode = llmPowered && !streamDone && isStreaming;
   const { displayed: typewriterText, done: typewriterDone } = useTypewriter(
-    !llmStatus?.available ? narrative : "",
+    !llmPowered ? narrative : "",
     8
   );
 
   // Determine what text to show
-  const displayedText = llmStatus?.available ? narrative : typewriterText;
-  const isDone = llmStatus?.available ? streamDone : typewriterDone;
+  const displayedText = llmPowered ? narrative : typewriterText;
+  const isDone = llmPowered ? streamDone : typewriterDone;
 
   // Auto scroll
   useEffect(() => {
@@ -298,11 +314,11 @@ function StoryPageContent() {
         {/* Header */}
         <motion.div className="text-center mb-8" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full mb-4">
-            {llmStatus?.available ? (
+            {llmPowered ? (
               <>
                 <Brain size={14} className="text-[var(--success)]" />
                 <span className="text-xs font-medium text-[var(--text-secondary)]">
-                  Powered by Ollama ({llmStatus.model || "llama3.2"}) + RAG Knowledge Base
+                  Powered by Ollama ({llmStatus?.model || "llama3.2"}) + RAG Knowledge Base
                 </span>
                 <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
               </>
@@ -317,7 +333,7 @@ function StoryPageContent() {
             <span className="gradient-text">Story Mode</span>
           </h1>
           <p className="text-[var(--text-secondary)]">
-            {llmStatus?.available
+            {llmPowered
               ? "Your data, narrated by a local Ollama AI brain with RAG-augmented intelligence"
               : "Your data, transformed into boardroom-ready intelligence"}
           </p>
@@ -351,7 +367,7 @@ function StoryPageContent() {
               {isStreaming && (
                 <span className="text-xs text-[var(--accent)] flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                  {llmStatus?.available ? "Ollama Streaming..." : "Generating..."}
+                  {llmPowered ? "Ollama Streaming..." : "Generating..."}
                 </span>
               )}
               {!isStreaming && !isDone && narrative && (
@@ -363,10 +379,10 @@ function StoryPageContent() {
               {isDone && <span className="text-xs text-[var(--success)] flex items-center gap-1"><CheckCircle2 size={12} /> Complete</span>}
             </div>
             <div className="flex items-center gap-2">
-              {llmStatus?.available && (
+              {llmPowered && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}>
                   <Cpu size={10} className="inline mr-1" />
-                  {llmStatus.model?.split(":")[0] || "LLM"}
+                  {llmStatus?.model?.split(":")[0] || "LLM"}
                 </span>
               )}
               <button onClick={handleCopy} className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1">

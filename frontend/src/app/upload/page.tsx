@@ -19,7 +19,6 @@ const SAMPLE_DATASETS = [
     rows: "~5,000",
     cols: 12,
     sector: "Retail & E-Commerce",
-    icon: "🛒",
     description: "Orders, products, customers, revenue with common retail data issues (missing values, duplicates, outliers, inconsistent casing)",
   },
 ];
@@ -198,7 +197,7 @@ function UploadPageContent() {
                 whileHover={{ scale: 1.01, borderColor: "rgba(99,102,241,0.3)" }}
                 whileTap={{ scale: 0.99 }}
               >
-                <div className="text-4xl">{d.icon}</div>
+                <div className="w-10 h-10 rounded-lg bg-[var(--primary-light)] text-[var(--primary)] flex items-center justify-center flex-shrink-0"><Database size={20} /></div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold">{d.name}</h3>
@@ -257,36 +256,6 @@ function UploadPageContent() {
                 <Sparkles size={14} />
                 Or try a demo dataset instead
               </a>
-            </div>
-
-            {/* ─── Import From Platform ─── */}
-            <div className="mt-10">
-              <h3 className="font-display font-semibold text-lg mb-1 text-center">Or Import From</h3>
-              <p className="text-xs text-[var(--text-muted)] text-center mb-5">Connect to platforms used by Indian researchers at ISRO, IITs, IISc, DRDO & more</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { id: "sheets", icon: "📊", name: "Google Sheets", desc: "Paste a Sheet URL", color: "#34a853" },
-                  { id: "datagov", icon: "🇮🇳", name: "data.gov.in", desc: "4L+ govt datasets", color: "#ff9800" },
-                  { id: "kaggle", icon: "🏆", name: "Kaggle", desc: "Import by slug", color: "#20beff" },
-                  { id: "sql", icon: "🗄️", name: "SQL Database", desc: "PostgreSQL / MySQL", color: "#6366f1" },
-                ].map((platform) => (
-                  <motion.button
-                    key={platform.id}
-                    className="glass-card text-center py-4 px-3 group"
-                    style={{ cursor: "pointer" }}
-                    whileHover={{ scale: 1.03, borderColor: `${platform.color}40` }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => {/* TODO: open modal for platform config */}}
-                  >
-                    <div className="text-2xl mb-2">{platform.icon}</div>
-                    <div className="font-semibold text-sm mb-0.5">{platform.name}</div>
-                    <div className="text-[10px] text-[var(--text-muted)]">{platform.desc}</div>
-                  </motion.button>
-                ))}
-              </div>
-              <p className="text-[10px] text-[var(--text-muted)] text-center mt-3">
-                Also supports: Hugging Face 🤗 export, Google Colab 📓 notebook generation
-              </p>
             </div>
           </motion.div>
         )}

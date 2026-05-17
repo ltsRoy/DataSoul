@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en">
       <body className="antialiased">
         {/* Mesh gradient background */}
         <div className="mesh-gradient" />

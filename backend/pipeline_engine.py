@@ -110,10 +110,10 @@ class IterativePipeline:
                 orig_dim = orig_qs["dimensions"].get(dim_name, {}).get("score", 0)
                 clean_dim = clean_qs["dimensions"].get(dim_name, {}).get("score", 0)
                 dimension_changes[dim_name] = {
-                    "before": round(orig_dim, 1),
-                    "after": round(clean_dim, 1),
-                    "change": round(clean_dim - orig_dim, 1),
-                    "improved": clean_dim > orig_dim,
+                    "before": round(float(orig_dim), 1),
+                    "after": round(float(clean_dim), 1),
+                    "change": round(float(clean_dim - orig_dim), 1),
+                    "improved": bool(clean_dim > orig_dim),
                 }
 
         # Column-level changes
@@ -184,9 +184,9 @@ class IterativePipeline:
                     changes.append({
                         "column": col_name,
                         "metric": "missing_pct",
-                        "before": orig_missing,
-                        "after": clean_missing,
-                        "improved": clean_missing < orig_missing,
+                        "before": float(orig_missing),
+                        "after": float(clean_missing),
+                        "improved": bool(clean_missing < orig_missing),
                     })
 
         # Columns that were dropped
@@ -269,7 +269,7 @@ class IterativePipeline:
     def auto_clean(self, session: dict) -> dict:
         """Apply auto-cleaning transformations — LLM+RAG augmented when available"""
         from llm_engine import get_llm
-        from rag_engine import RAGEngine
+        from rag_engine import get_rag
         from csv_corrector import CSVCorrector
 
         df = session["df"].copy()
@@ -282,7 +282,7 @@ class IterativePipeline:
             profile = profiler.generate_full_profile()
 
         llm = get_llm()
-        rag = RAGEngine()
+        rag = get_rag()
 
         # ─── Step 0: Ask LLM+RAG for intelligent cleaning plan ───
         llm_plan = None
@@ -537,6 +537,7 @@ Keep response under 300 words. Be specific to this dataset's sector and context.
             system="You are a data engineering expert. Give specific, actionable cleaning recommendations. No fluff.",
             temperature=0.2,
             max_tokens=500,
+            timeout=15,  # Fast-fail: cleaning plan is nice-to-have, not blocking
         )
 
     def _decide_imputation(self, col: str, col_profile: dict, df, llm_plan: str | None) -> tuple[str, str]:
@@ -550,18 +551,21 @@ Keep response under 300 words. Be specific to this dataset's sector and context.
         # Check if LLM has a specific recommendation for this column
         if llm_plan:
             plan_lower = llm_plan.lower()
-            if col_lower in plan_lower:
-                if "skip" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+            col_pos = plan_lower.find(col_lower)
+            if col_pos >= 0:
+                # Look at the ~200 chars after the column mention
+                snippet = plan_lower[col_pos:col_pos + 200]
+                if "skip" in snippet:
                     return "skip", f"LLM advised skipping: too much missing data or column not useful"
-                if "zero" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+                if "zero" in snippet:
                     return "zero", f"LLM recommends zero-fill: {col} likely represents absence (e.g. discount, count)"
-                if "median" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+                if "median" in snippet:
                     return "median", f"LLM recommends median: robust to skew in {col}"
-                if "mean" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+                if "mean" in snippet:
                     return "mean", f"LLM recommends mean: {col} distribution is approximately normal"
-                if "mode" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+                if "mode" in snippet:
                     return "mode", f"LLM recommends mode: most common value preserves distribution"
-                if "unknown" in plan_lower[plan_lower.index(col_lower):plan_lower.index(col_lower)+200]:
+                if "unknown" in snippet:
                     return "unknown", f"LLM recommends 'Unknown': missing category may be informative"
 
         # ─── Deterministic fallback ───
@@ -611,5 +615,6 @@ Be concise and mention the most impactful changes.""",
             system="You are DataSoul AI. Summarize cleaning actions briefly.",
             temperature=0.3,
             max_tokens=150,
+            timeout=10,  # Fast-fail: summary is optional
         )
 

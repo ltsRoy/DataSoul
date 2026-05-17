@@ -13,7 +13,7 @@ import numpy as np
 from typing import Optional
 
 from llm_engine import get_llm
-from rag_engine import RAGEngine
+from rag_engine import get_rag
 
 
 class PredictionEngine:
@@ -21,7 +21,7 @@ class PredictionEngine:
 
     def __init__(self):
         self._llm = get_llm()
-        self._rag = RAGEngine()
+        self._rag = get_rag()
 
     # ═══ PREDICT MISSING VALUES ═══
 

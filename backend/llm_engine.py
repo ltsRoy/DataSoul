@@ -1,7 +1,7 @@
 """
 DataSoul — LLM Engine
 ========================
-Local LLM client using Ollama for generating intelligent narratives,
+Local LLM client using Ollama REST API for generating intelligent narratives,
 conversational Q&A, and dataset-specific insights.
 
 Architecture:
@@ -10,16 +10,24 @@ Architecture:
   3. RAG context from ChromaDB is injected into every prompt
   4. Falls back to template engine if Ollama is unavailable
 
+Uses direct HTTP calls to Ollama REST API (http://localhost:11434)
+instead of the `ollama` Python library to avoid import-hang issues.
+
 Supports: streaming, multi-turn chat, RAG-augmented generation.
 """
 
 import json
 import time
+import requests
 from typing import Optional, Generator
+
+OLLAMA_BASE = "http://localhost:11434"
+_LLM_TIMEOUT = 120  # seconds — Ollama on consumer hardware needs time for long generations
+_CONNECT_TIMEOUT = 5  # seconds — fast-fail if Ollama isn't running
 
 
 class LLMEngine:
-    """Ollama-powered LLM client with graceful fallback"""
+    """Ollama-powered LLM client with graceful fallback (REST API)"""
 
     DEFAULT_MODEL = "llama3.2"
     FALLBACK_MODELS = ["llama3.1", "llama3", "mistral", "phi3", "gemma2", "qwen2", "deepseek-r1"]
@@ -38,35 +46,34 @@ RULES:
 
     def __init__(self, model: str | None = None):
         self.model = model or self.DEFAULT_MODEL
-        self._client = None
         self._available = False
         self._active_model: str | None = None
         self._model_info: dict = {}
         self._init_client()
 
     def _init_client(self):
-        """Initialize Ollama client and detect best model"""
+        """Initialize by querying Ollama REST API for available models"""
         try:
-            import ollama
-            self._client = ollama
+            resp = requests.get(
+                f"{OLLAMA_BASE}/api/tags",
+                timeout=_CONNECT_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
-            # Check which models are available
-            models_resp = ollama.list()
-            models_list = models_resp.get("models", [])
-
-            if not models_list:
-                # Try alternate response format (newer ollama versions)
-                if isinstance(models_resp, list):
-                    models_list = models_resp
-
+            models_list = data.get("models", [])
             installed = {}
             for m in models_list:
-                name = m.get("name", "") if isinstance(m, dict) else str(m)
+                name = m.get("model", m.get("name", ""))
                 base_name = name.split(":")[0]
+                if not base_name:
+                    continue
                 installed[base_name] = {
                     "name": name,
-                    "size": m.get("size", 0) if isinstance(m, dict) else 0,
-                    "modified": m.get("modified_at", "") if isinstance(m, dict) else "",
+                    "size": m.get("size", 0),
+                    "modified": m.get("modified_at", ""),
+                    "parameter_size": m.get("details", {}).get("parameter_size", ""),
+                    "quantization": m.get("details", {}).get("quantization_level", ""),
                 }
 
             # Priority: exact match → fallback chain → any installed model
@@ -89,16 +96,20 @@ RULES:
                     self._available = True
 
             if self._available:
-                print(f"[LLM] Ollama ready -- model: {self._active_model}")
+                print(f"[LLM] Ollama ready — model: {self._active_model} "
+                      f"({self._model_info.get('parameter_size', '?')}, "
+                      f"{self._model_info.get('quantization', '?')})")
             else:
                 print(f"[LLM] Ollama running but no models found. Run: ollama pull {self.DEFAULT_MODEL}")
 
+        except requests.ConnectionError:
+            print("[LLM] Ollama not running. Start it: ollama serve")
+            self._available = False
+        except requests.Timeout:
+            print("[LLM] Ollama connection timed out")
+            self._available = False
         except Exception as e:
-            error_msg = str(e)
-            if "refused" in error_msg.lower() or "connect" in error_msg.lower():
-                print(f"[LLM] Ollama not running. Start it: ollama serve")
-            else:
-                print(f"[LLM] Ollama not available: {e}")
+            print(f"[LLM] Ollama not available: {e}")
             self._available = False
 
     @property
@@ -112,33 +123,51 @@ RULES:
             "preferred_model": self.model,
             "engine": "ollama",
             "model_size": self._model_info.get("size", 0),
+            "parameter_size": self._model_info.get("parameter_size", ""),
+            "quantization": self._model_info.get("quantization", ""),
         }
 
     # ─── CORE GENERATION ───
 
     def generate(self, prompt: str, system: str | None = None,
-                 temperature: float = 0.7, max_tokens: int = 2000) -> str:
-        """Generate text from a prompt. Returns empty string if LLM unavailable."""
-        if not self._available or not self._client:
+                 temperature: float = 0.7, max_tokens: int = 2000,
+                 timeout: int | None = None) -> str:
+        """Generate text from a prompt. Returns empty string if LLM unavailable.
+        timeout: seconds to wait before aborting (default: _LLM_TIMEOUT)."""
+        if not self._available:
             return ""
 
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
         try:
-            messages = []
-            if system:
-                messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
-
-            response = self._client.chat(
-                model=self._active_model,
-                messages=messages,
-                options={"temperature": temperature, "num_predict": max_tokens, "num_gpu": 0},
+            resp = requests.post(
+                f"{OLLAMA_BASE}/api/chat",
+                json={
+                    "model": self._active_model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                    },
+                    "keep_alive": "5m",
+                },
+                timeout=(_CONNECT_TIMEOUT, timeout or _LLM_TIMEOUT),
             )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("message", {}).get("content", "")
 
-            content = ""
-            if isinstance(response, dict):
-                content = response.get("message", {}).get("content", "")
-            return content
-
+        except requests.Timeout:
+            print(f"[LLM] Generation timed out after {timeout or _LLM_TIMEOUT}s")
+            return ""
+        except requests.ConnectionError:
+            print("[LLM] Ollama connection lost during generation")
+            self._available = False
+            return ""
         except Exception as e:
             print(f"[LLM] Generation error: {e}")
             return ""
@@ -146,28 +175,50 @@ RULES:
     def generate_stream(self, prompt: str, system: str | None = None,
                         temperature: float = 0.7, max_tokens: int = 2000) -> Generator[str, None, None]:
         """Stream text generation token by token. Yields chunks."""
-        if not self._available or not self._client:
+        if not self._available:
             return
 
-        try:
-            messages = []
-            if system:
-                messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
 
-            stream = self._client.chat(
-                model=self._active_model,
-                messages=messages,
-                options={"temperature": temperature, "num_predict": max_tokens, "num_gpu": 0},
+        try:
+            resp = requests.post(
+                f"{OLLAMA_BASE}/api/chat",
+                json={
+                    "model": self._active_model,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                    },
+                    "keep_alive": "5m",
+                },
+                timeout=(_CONNECT_TIMEOUT, _LLM_TIMEOUT),
                 stream=True,
             )
+            resp.raise_for_status()
 
-            for chunk in stream:
-                if isinstance(chunk, dict):
+            for line in resp.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
                     token = chunk.get("message", {}).get("content", "")
                     if token:
                         yield token
+                    if chunk.get("done", False):
+                        break
+                except json.JSONDecodeError:
+                    continue
 
+        except requests.Timeout:
+            print(f"[LLM] Stream timed out after {_LLM_TIMEOUT}s")
+        except requests.ConnectionError:
+            print("[LLM] Ollama connection lost during streaming")
+            self._available = False
         except Exception as e:
             print(f"[LLM] Stream error: {e}")
 
@@ -360,7 +411,7 @@ Use this context to enrich your response where relevant."""
         if not self._available:
             return False
         try:
-            result = self.generate("Say 'ready' in one word.", temperature=0, max_tokens=5)
+            result = self.generate("Say 'ready' in one word.", temperature=0, max_tokens=5, timeout=60)
             return bool(result)
         except Exception:
             return False
