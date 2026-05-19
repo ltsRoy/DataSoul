@@ -277,9 +277,17 @@ class IterativePipeline:
 
         source_df = session.get("df_transformed", session["df"])
         df = source_df.copy()
-        profile = DataProfiler(df).generate_full_profile()
-        profile["sector"] = SectorDetector().detect(df)
-        threats = ThreatDetector(df, profile).detect_all_threats()
+        
+        # Use profile from session if available, otherwise generate
+        profile = session.get("profile")
+        if not profile:
+            profile = DataProfiler(df).generate_full_profile()
+            profile["sector"] = SectorDetector().detect(df)
+            
+        threats = session.get("threats")
+        if not threats:
+            threats = ThreatDetector(df, profile).detect_all_threats()
+            
         audit = []
 
         llm = get_llm()
@@ -300,8 +308,7 @@ class IterativePipeline:
                 for col in cleaned_df.columns:
                     df[col] = cleaned_df[col]
                 audit.extend(semantic_audit)
-                profile = DataProfiler(df).generate_full_profile()
-                profile["sector"] = SectorDetector().detect(df)
+                # Removed redundant profile generation here
         except Exception as e:
             print(f"[Pipeline] Semantic cleaning step failed (non-critical): {e}")
 
@@ -314,8 +321,7 @@ class IterativePipeline:
                 if llm_clean_audit:
                     audit.extend(llm_clean_audit)
                     print(f"[Pipeline] LLM cleaner applied {len(llm_clean_audit)} fix(es)")
-                    profile = DataProfiler(df).generate_full_profile()
-                    profile["sector"] = SectorDetector().detect(df)
+                    # Removed redundant profile generation here
             else:
                 print("[Pipeline] LLM not available — skipping AI cleaning layer")
         except Exception as e:
@@ -325,22 +331,15 @@ class IterativePipeline:
         try:
             corrector = CSVCorrector()
             header_audit = corrector._clean_column_names(df)
-            if header_audit:
-                profile = DataProfiler(df).generate_full_profile()
-                profile["sector"] = SectorDetector().detect(df)
             type_audit = corrector._fix_type_issues(df)
             enc_audit = corrector._fix_encoding(df)
             drop_audit = corrector._drop_empty_reference_columns(df)
-            if drop_audit:
-                profile = DataProfiler(df).generate_full_profile()
-                profile["sector"] = SectorDetector().detect(df)
+            
             audit.extend(header_audit)
             audit.extend(type_audit)
             audit.extend(enc_audit)
             audit.extend(drop_audit)
-            if type_audit or enc_audit:
-                profile = DataProfiler(df).generate_full_profile()
-                profile["sector"] = SectorDetector().detect(df)
+            # Removed redundant profile generations here
         except Exception as e:
             print(f"[Pipeline] CSV correction step failed (non-critical): {e}")
 
@@ -605,16 +604,12 @@ class IterativePipeline:
         # Store cleaned data
         session["df_transformed"] = df
         session["audit_trail"] = session.get("audit_trail", []) + audit
-        session.pop("profile", None)
-        session.pop("threats", None)
+        
+        # We don't pop profile/threats here anymore because iterate() needs them
+        # to compare before/after. iterate() will replace them with the new profile.
 
-        # ─── Step 5: LLM summary of what was done ───
+        # ─── Step 5: Skip LLM summary of what was done (Perf Optimization) ───
         llm_summary = None
-        if llm.is_available and audit:
-            try:
-                llm_summary = self._generate_cleaning_summary(llm, audit, profile)
-            except Exception:
-                pass
 
         return {
             "status": "success",

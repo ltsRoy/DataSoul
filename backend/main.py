@@ -5,6 +5,7 @@ AI narratives, RAG chat, predictions, and integrations.
 import os
 import uuid
 import json
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -36,7 +37,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -524,7 +525,7 @@ def llm_warmup():
 # --- csv correction endpoints ---
 
 @app.post("/api/correct/{session_id}")
-def auto_correct_dataset(session_id: str, body: dict | None = None):
+async def auto_correct_dataset(session_id: str, body: dict | None = None):
     """Full AI-powered CSV correction pipeline"""
     session = sessions.get(session_id)
     if not session:
@@ -534,7 +535,8 @@ def auto_correct_dataset(session_id: str, body: dict | None = None):
     profile = session.get("profile")
     threshold = (body or {}).get("threshold", 0.90)
 
-    result = csv_corrector.auto_correct(df, profile=profile, threshold=threshold)
+    # Run CPU-bound auto_correct in a thread to avoid blocking the event loop
+    result = await asyncio.to_thread(csv_corrector.auto_correct, df, profile=profile, threshold=threshold)
 
     if result["corrections_applied"] > 0:
         session["df_transformed"] = result.pop("df")
@@ -547,7 +549,7 @@ def auto_correct_dataset(session_id: str, body: dict | None = None):
 
 
 @app.post("/api/correct/{session_id}/analyze")
-def analyze_corrections(session_id: str):
+async def analyze_corrections(session_id: str):
     """Analyze dataset and return correction suggestions without applying changes"""
     session = sessions.get(session_id)
     if not session:
@@ -556,7 +558,8 @@ def analyze_corrections(session_id: str):
     df = session.get("df_transformed", session["df"])
     profile = session.get("profile")
 
-    return csv_corrector.analyze(df, profile=profile)
+    # Directly await the async implementation — no ThreadPoolExecutor needed
+    return await csv_corrector.analyze_async(df, profile=profile)
 
 
 @app.post("/api/correct/{session_id}/apply")

@@ -70,30 +70,23 @@ class CSVCorrector:
         results["semantic_issues"] = self._detect_semantic_issues(df)
         results["issues_found"] += len(results["semantic_issues"])
 
-        candidate_cols = []
+        # Count candidate columns
         for col in df.select_dtypes(include=["object"]).columns:
             clean = df[col].dropna().astype(str)
-            if len(clean) == 0 or clean.nunique() > 500:
-                continue
-            results["columns_analyzed"] += 1
-            candidate_cols.append(col)
+            if len(clean) > 0 and clean.nunique() <= 500:
+                results["columns_analyzed"] += 1
 
-        semaphore = asyncio.Semaphore(3)
+        # Run both batch analyses concurrently using the existing batch infrastructure
+        category_task = self._analyze_all_categories_async(df, profile)
+        values_task = self._analyze_all_values_async(df, profile)
+        category_results, values_results = await asyncio.gather(category_task, values_task)
 
-        async def scan_column(col: str):
-            async with semaphore:
-                clean = df[col].dropna().astype(str)
-                merges = await self._analyze_categories_async(df, col, profile)
-                corrections = []
-                if clean.nunique() <= 100:
-                    corrections = await self._analyze_column_values_async(df, col, profile)
-                return merges, corrections
-
-        scanned = await asyncio.gather(*(scan_column(col) for col in candidate_cols))
-        for merges, corrections in scanned:
+        for col, merges in category_results:
             if merges:
                 results["category_merges"].extend(merges)
                 results["issues_found"] += len(merges)
+
+        for col, corrections in values_results:
             if corrections:
                 results["corrections"].extend(corrections)
                 results["issues_found"] += len(corrections)
@@ -449,7 +442,7 @@ Only flag clear duplicates (>80% confident). If none, return []. JSON only."""
             resp = await self._llm.agenerate(
                 prompt,
                 temperature=0.1,
-                max_tokens=600,
+                max_tokens=400,
                 timeout=20,
                 json_mode=True,
             )
@@ -483,16 +476,22 @@ Only flag clear duplicates (>80% confident). If none, return []. JSON only."""
         batch_size = 5
         results = []
         
+        tasks = []
+        batches = []
         for i in range(0, len(cols), batch_size):
             batch_cols = cols[i:i + batch_size]
-            try:
-                batch_res = await self._analyze_categories_batch_async(df, batch_cols, profile)
-                for col in batch_cols:
-                    results.append((col, batch_res.get(col, [])))
-            except Exception as e:
-                print(f"[CSVCorrector] Failed batch category analysis for {batch_cols}: {e}")
+            batches.append(batch_cols)
+            tasks.append(self._analyze_categories_batch_async(df, batch_cols, profile))
+            
+        task_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for batch_cols, batch_res in zip(batches, task_results):
+            if isinstance(batch_res, Exception):
+                print(f"[CSVCorrector] Failed batch category analysis for {batch_cols}: {batch_res}")
                 for col in batch_cols:
                     results.append((col, []))
+            elif isinstance(batch_res, dict):
+                for col in batch_cols:
+                    results.append((col, batch_res.get(col, [])))
                     
         return results
 
@@ -549,7 +548,7 @@ Only clear errors (confidence>0.7). JSON only."""
                 prompt,
                 system="You are a data cleaning expert. Return only a valid JSON dictionary.",
                 temperature=0.1,
-                max_tokens=1500,
+                max_tokens=1000,
                 timeout=40,
                 json_mode=True,
             )
@@ -572,49 +571,6 @@ Only clear errors (confidence>0.7). JSON only."""
         except Exception as e:
             print(f"[CSVCorrector] LLM value analysis batch failed for {cols}: {e}")
         return {}
-        if not self._llm.is_available:
-            return []
-        clean = df[col].dropna().astype(str)
-        if len(clean) == 0:
-            return []
-
-        vc = clean.value_counts()
-        sample = list(set(vc.head(20).index.tolist() + vc.tail(min(20, len(vc))).index.tolist()))[:40]
-
-        rag_ctx = ""
-        if self._rag.is_ready and profile:
-            sector = profile.get("sector", {}).get("sector_name", "General")
-            rag_ctx = self._rag.get_context_for_prompt(
-                f"valid values for {col} in {sector}", dataset_profile=profile, n_results=2)
-
-        vals = "\n".join(f'  {i+1}. "{v}" ({int(vc.get(v, 0))}x)' for i, v in enumerate(sample))
-        prompt = f"""Column "{col}" — identify errors and suggest corrections.
-
-VALUES (with frequency):
-{vals}
-{f"CONTEXT: {rag_ctx[:300]}" if rag_ctx and "No relevant" not in rag_ctx else ""}
-
-Return JSON: [{{"value": "wrong", "correction": "right", "confidence": 0.85, "reason": "why"}}]
-Only clear errors (confidence>0.7). If none, return []. JSON only."""
-
-        try:
-            resp = await self._llm.agenerate(
-                prompt,
-                temperature=0.1,
-                max_tokens=600,
-                timeout=20,
-                json_mode=True,
-            )
-            items = self._parse_json_array(resp, context=f"value {col}")
-            return [{"column": col, "old_value": s["value"], "new_value": s["correction"],
-                     "count": int(vc.get(s["value"], 0)),
-                     "confidence": round(float(s.get("confidence", 0.75)), 2),
-                     "reason": s.get("reason", "LLM-detected error"), "type": "value_correction"}
-                    for s in items if isinstance(s, dict) and "value" in s and "correction" in s
-                    and float(s.get("confidence", 0)) >= self.SUGGEST_THRESHOLD]
-        except Exception as e:
-            print(f"[CSVCorrector] LLM value analysis failed for '{col}': {e}")
-        return []
 
     def _correct_values(self, df: pd.DataFrame, profile: dict | None, threshold: float) -> list[dict]:
         audit = []
@@ -642,16 +598,23 @@ Only clear errors (confidence>0.7). If none, return []. JSON only."""
 
         batch_size = 5
         results = []
+        
+        tasks = []
+        batches = []
         for i in range(0, len(cols), batch_size):
             batch_cols = cols[i:i + batch_size]
-            try:
-                batch_res = await self._analyze_columns_values_batch_async(df, batch_cols, profile)
-                for col in batch_cols:
-                    results.append((col, batch_res.get(col, [])))
-            except Exception as e:
-                print(f"[CSVCorrector] Failed batch value analysis for {batch_cols}: {e}")
+            batches.append(batch_cols)
+            tasks.append(self._analyze_columns_values_batch_async(df, batch_cols, profile))
+            
+        task_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for batch_cols, batch_res in zip(batches, task_results):
+            if isinstance(batch_res, Exception):
+                print(f"[CSVCorrector] Failed batch value analysis for {batch_cols}: {batch_res}")
                 for col in batch_cols:
                     results.append((col, []))
+            elif isinstance(batch_res, dict):
+                for col in batch_cols:
+                    results.append((col, batch_res.get(col, [])))
 
         return results
 

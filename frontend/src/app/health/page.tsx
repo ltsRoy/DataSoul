@@ -338,7 +338,7 @@ function HealthPageContent() {
       const status = await getLLMStatus();
       if (!status.available) {
         setAiCorrectionsOpen(false);
-        setAiCorrectorError("Local AI engine offline. Please ensure Ollama is running (`ollama serve`) and the model (`qwen2.5:7b`) is pulled to enable intelligent scanning.");
+        setAiCorrectorError("Data cleaning engine offline. Please ensure the backend and Ollama are running properly.");
         return;
       }
       const res = await analyzeCorrections(sessionId);
@@ -360,26 +360,21 @@ function HealthPageContent() {
   const handleApplyFixes = async () => {
     if (!sessionId || !aiCorrections) return;
     
-    // Build list of approved corrections
+    // Apply all corrections (no manual selection — all are auto-approved)
     const approved: {column: string; old_value: string; new_value: string}[] = [];
     
-    aiCorrections.category_merges.forEach((m, i) => {
-      if (selectedFixes.has(`merge_${i}`)) {
-        approved.push({ column: m.column, old_value: m.old_value, new_value: m.new_value });
-      }
+    aiCorrections.category_merges.forEach((m) => {
+      approved.push({ column: m.column, old_value: m.old_value, new_value: m.new_value });
     });
     
-    aiCorrections.corrections.forEach((c, i) => {
-      if (selectedFixes.has(`corr_${i}`)) {
-        approved.push({ column: c.column, old_value: c.old_value, new_value: c.new_value });
-      }
+    aiCorrections.corrections.forEach((c) => {
+      approved.push({ column: c.column, old_value: c.old_value, new_value: c.new_value });
     });
     
-    setIsAutoCleaning(true); // Re-use loading state
+    setIsAutoCleaning(true);
     setAiCorrectionsOpen(false);
     setError(null);
     try {
-      // Apply the user-selected fixes
       if (approved.length > 0) {
         await applyCorrections(sessionId, approved);
       }
@@ -567,7 +562,7 @@ function HealthPageContent() {
             >
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
                 <Brain size={20} className="text-[var(--primary)]" />
-                Pattern Scanner
+                Data Correction Analysis
                 {aiCorrectorLoading && <Loader2 size={16} className="animate-spin text-[var(--primary)] ml-2" />}
               </h3>
 
@@ -577,43 +572,21 @@ function HealthPageContent() {
                     <Activity size={32} className="text-[var(--primary)]" />
                     <motion.div className="absolute inset-0 border-2 border-[var(--primary)] rounded-full" animate={{ scale: [1, 1.5, 1], opacity: [1, 0, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
                   </div>
-                  <p className="text-sm text-[var(--text-secondary)]">Running local engine diagnostics and scanning correction candidates...</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Analyzing data for correction candidates...</p>
                 </div>
               ) : aiCorrections ? (
                 <div className="space-y-6">
                   {/* Category Merges */}
                   {aiCorrections.category_merges.length > 0 && (
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-base font-bold flex items-center gap-2">
-                          <Layers size={18} className="text-[var(--warning)]" />
-                          Category Merges ({aiCorrections.category_merges.length})
-                        </h4>
-                        <button 
-                          className="text-sm text-[var(--primary)] hover:underline font-bold bg-[rgba(99,102,241,0.1)] px-3 py-1 rounded-md"
-                          onClick={() => {
-                            const newSet = new Set(selectedFixes);
-                            const allSelected = aiCorrections.category_merges.every((_, i) => newSet.has(`merge_${i}`));
-                            aiCorrections.category_merges.forEach((_, i) => {
-                              if (allSelected) newSet.delete(`merge_${i}`);
-                              else newSet.add(`merge_${i}`);
-                            });
-                            setSelectedFixes(newSet);
-                          }}
-                        >
-                          {aiCorrections.category_merges.every((_, i) => selectedFixes.has(`merge_${i}`)) ? "Deselect All" : "Select All"}
-                        </button>
-                      </div>
+                      <h4 className="text-base font-bold flex items-center gap-2 mb-3">
+                        <Layers size={18} className="text-[var(--warning)]" />
+                        Category Merges ({aiCorrections.category_merges.length})
+                      </h4>
                       <div className="space-y-2">
                         {aiCorrections.category_merges.map((merge, i) => (
-                          <div 
-                            key={i} 
-                            className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:bg-[var(--glass-bg)] shadow-sm ${selectedFixes.has(`merge_${i}`) ? 'border-[var(--primary)] bg-[rgba(99,102,241,0.05)]' : 'border-[var(--glass-border)] bg-[var(--glass-bg)]'}`}
-                            onClick={() => { const newSet = new Set(selectedFixes); if (selectedFixes.has(`merge_${i}`)) newSet.delete(`merge_${i}`); else newSet.add(`merge_${i}`); setSelectedFixes(newSet); }}
-                          >
-                            <div className="pt-0.5">
-                              <input type="checkbox" className="w-5 h-5 accent-[var(--primary)] cursor-pointer" checked={selectedFixes.has(`merge_${i}`)} readOnly />
-                            </div>
+                          <div key={i} className="flex items-start gap-3 p-4 rounded-xl border border-[var(--primary)] bg-[rgba(99,102,241,0.05)] shadow-sm">
+                            <CheckCircle2 size={16} className="text-[var(--primary)] mt-0.5 flex-shrink-0" />
                             <div className="flex-1">
                               <div className="text-base font-medium">Merge <span className="text-[var(--critical)] font-bold">&quot;{merge.old_value}&quot;</span> into <span className="text-[var(--success)] font-bold">&quot;{merge.new_value}&quot;</span></div>
                               <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Reason:</span> {merge.reason}</div>
@@ -626,37 +599,15 @@ function HealthPageContent() {
 
                   {/* Value Corrections */}
                   {aiCorrections.corrections.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-3 mt-4">
-                        <h4 className="text-base font-bold flex items-center gap-2">
-                          <Zap size={18} className="text-[var(--accent)]" />
-                          Value Corrections ({aiCorrections.corrections.length})
-                        </h4>
-                        <button 
-                          className="text-sm text-[var(--primary)] hover:underline font-bold bg-[rgba(99,102,241,0.1)] px-3 py-1 rounded-md"
-                          onClick={() => {
-                            const newSet = new Set(selectedFixes);
-                            const allSelected = aiCorrections.corrections.every((_, i) => newSet.has(`corr_${i}`));
-                            aiCorrections.corrections.forEach((_, i) => {
-                              if (allSelected) newSet.delete(`corr_${i}`);
-                              else newSet.add(`corr_${i}`);
-                            });
-                            setSelectedFixes(newSet);
-                          }}
-                        >
-                          {aiCorrections.corrections.every((_, i) => selectedFixes.has(`corr_${i}`)) ? "Deselect All" : "Select All"}
-                        </button>
-                      </div>
+                    <div className="mt-4">
+                      <h4 className="text-base font-bold flex items-center gap-2 mb-3">
+                        <Zap size={18} className="text-[var(--accent)]" />
+                        Value Corrections ({aiCorrections.corrections.length})
+                      </h4>
                       <div className="space-y-2">
                         {aiCorrections.corrections.map((corr, i) => (
-                          <div 
-                            key={i} 
-                            className={`flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer hover:bg-[var(--glass-bg)] shadow-sm ${selectedFixes.has(`corr_${i}`) ? 'border-[var(--primary)] bg-[rgba(99,102,241,0.05)]' : 'border-[var(--glass-border)] bg-[var(--glass-bg)]'}`}
-                            onClick={() => { const newSet = new Set(selectedFixes); if (selectedFixes.has(`corr_${i}`)) newSet.delete(`corr_${i}`); else newSet.add(`corr_${i}`); setSelectedFixes(newSet); }}
-                          >
-                            <div className="pt-0.5">
-                              <input type="checkbox" className="w-5 h-5 accent-[var(--primary)] cursor-pointer" checked={selectedFixes.has(`corr_${i}`)} readOnly />
-                            </div>
+                          <div key={i} className="flex items-start gap-3 p-4 rounded-xl border border-[var(--primary)] bg-[rgba(99,102,241,0.05)] shadow-sm">
+                            <CheckCircle2 size={16} className="text-[var(--primary)] mt-0.5 flex-shrink-0" />
                             <div className="flex-1">
                               <div className="text-base font-medium">Fix <span className="text-[var(--critical)] font-bold">&quot;{corr.old_value}&quot;</span> → <span className="text-[var(--success)] font-bold">&quot;{corr.new_value}&quot;</span></div>
                               <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Reason:</span> {corr.reason}</div>
@@ -667,21 +618,9 @@ function HealthPageContent() {
                     </div>
                   )}
 
-                  {/* Auto-fixable Summary */}
-                  {(aiCorrections.type_issues.length > 0 || aiCorrections.encoding_issues.length > 0) && (
-                    <div className="p-3 rounded-lg bg-[rgba(34,197,94,0.05)] border border-[rgba(34,197,94,0.2)]">
-                      <div className="flex items-center gap-2 text-sm font-medium text-[var(--success)] mb-1">
-                        <CheckCircle2 size={16} /> Auto-Fixable Issues Detected
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        Found {aiCorrections.type_issues.length} type issues (e.g., currency as string) and {aiCorrections.encoding_issues.length} encoding artifacts. These will be fixed automatically when you apply.
-                      </p>
-                    </div>
-                  )}
-
                   {aiCorrections.category_merges.length === 0 && aiCorrections.corrections.length === 0 && (
                     <div className="text-center py-6 text-[var(--text-secondary)] text-sm">
-                      No category merges or typo corrections were found. Type, encoding, numeric, and missing-value fixes can still be applied automatically.
+                      No category merges or typo corrections were found. Type, encoding, numeric, and missing-value fixes will still be applied automatically.
                     </div>
                   )}
 
@@ -912,10 +851,10 @@ function HealthPageContent() {
           </div>
           <div className="flex gap-3">
             <button
-              className="text-sm flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg hover:scale-105"
+              className="text-sm flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg hover:scale-105 hover:brightness-110"
               onClick={handleAnalyze}
               disabled={isAutoCleaning || aiCorrectorLoading}
-              style={{ background: "rgba(99,102,241,0.15)", border: "2px solid var(--primary)", color: "var(--primary-light)" }}
+              style={{ background: "var(--gradient-primary)", border: "none", color: "white", boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}
             >
               <Brain size={18} />
               Scan with Ollama

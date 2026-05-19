@@ -138,13 +138,17 @@ class LLMCleaner:
         batch_size = 5
         all_plans = {}
 
+        tasks = []
         for i in range(0, len(cols), batch_size):
             batch_cols = cols[i:i + batch_size]
-            try:
-                batch_plans = await self._analyse_columns_batch_async(df_out, batch_cols, schema)
-                all_plans.update(batch_plans)
-            except Exception as e:
-                print(f"[LLMCleaner] Failed batch analysis for columns {batch_cols}: {e}")
+            tasks.append(self._analyse_columns_batch_async(df_out, batch_cols, schema))
+            
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for batch_res in results:
+            if isinstance(batch_res, Exception):
+                print(f"[LLMCleaner] Failed batch analysis: {batch_res}")
+            elif isinstance(batch_res, dict):
+                all_plans.update(batch_res)
 
         # Step 3: Apply plans
         for col, plans in all_plans.items():
@@ -221,7 +225,7 @@ class LLMCleaner:
             prompt,
             system="You are a precise data engineering expert. Return only valid JSON dictionaries.",
             temperature=0.05,
-            max_tokens=1500,
+            max_tokens=1000,
             timeout=40,  # Elevated timeout for batched response
             json_mode=True,
         )
@@ -249,7 +253,7 @@ class LLMCleaner:
             prompt,
             system="Return only valid JSON.",
             temperature=0.05,
-            max_tokens=600,
+            max_tokens=400,
             timeout=15,
             json_mode=True,
         )

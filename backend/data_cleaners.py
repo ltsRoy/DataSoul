@@ -581,7 +581,7 @@ class DataCleaners:
         }
 
         for typo, fix in domain_fixes.items():
-            cleaned = cleaned.str.replace(f'@{typo}', f'@{fix}', regex=False)
+            cleaned = cleaned.str.replace(rf'@{typo}$', f'@{fix}', regex=True)
 
         changed = (cleaned != original.str.strip())
         count = int(changed.sum())
