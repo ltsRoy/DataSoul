@@ -255,7 +255,7 @@ function StoryPageContent() {
           </span>
           {llmStatus?.available && (
             <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
-              <Brain size={12} /> Powered by local Ollama AI + RAG knowledge base
+              <Brain size={12} /> RAG-Augmented Knowledge Engine
             </span>
           )}
         </div>
@@ -318,7 +318,7 @@ function StoryPageContent() {
               <>
                 <Brain size={14} className="text-[var(--success)]" />
                 <span className="text-xs font-medium text-[var(--text-secondary)]">
-                  Powered by Ollama ({llmStatus?.model || "llama3.2"}) + RAG Knowledge Base
+                  RAG-Augmented Knowledge Engine ({llmStatus?.model || "local model"})
                 </span>
                 <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
               </>
@@ -334,7 +334,7 @@ function StoryPageContent() {
           </h1>
           <p className="text-[var(--text-secondary)]">
             {llmPowered
-              ? "Your data, narrated by a local Ollama AI brain with RAG-augmented intelligence"
+              ? "Executive Data Narrative Engine"
               : "Your data, transformed into boardroom-ready intelligence"}
           </p>
         </motion.div>
@@ -367,7 +367,7 @@ function StoryPageContent() {
               {isStreaming && (
                 <span className="text-xs text-[var(--accent)] flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-                  {llmPowered ? "Ollama Streaming..." : "Generating..."}
+                  {llmPowered ? "Streaming Narrative..." : "Generating..."}
                 </span>
               )}
               {!isStreaming && !isDone && narrative && (

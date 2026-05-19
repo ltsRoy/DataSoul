@@ -1,10 +1,5 @@
-"""
-DataSoul — Prediction Engine
-================================
-ML + LLM hybrid engine for data predictions, trend forecasting,
-anomaly detection, and feature engineering suggestions.
-
-Uses scikit-learn for computation, Ollama for interpretation.
+"""ML predictions, trend forecasting, anomaly detection, and feature suggestions.
+scikit-learn handles computation; Ollama provides interpretation.
 """
 
 import json
@@ -23,7 +18,7 @@ class PredictionEngine:
         self._llm = get_llm()
         self._rag = get_rag()
 
-    # ═══ PREDICT MISSING VALUES ═══
+    # -- predict missing values --
 
     def predict_missing(self, df: pd.DataFrame, target_col: str,
                         profile: dict | None = None) -> dict:

@@ -893,3 +893,53 @@ export async function suggestFeatures(
     { method: "POST" }
   );
 }
+
+// -- integration imports --
+
+export async function importFromKaggle(
+  datasetSlug: string,
+  filename?: string,
+  credentials?: { username: string; key: string }
+): Promise<UploadResponse> {
+  return apiFetch<UploadResponse>("/api/import/kaggle", {
+    method: "POST",
+    body: JSON.stringify({ dataset_slug: datasetSlug, filename, credentials }),
+  });
+}
+
+export async function importFromGoogleSheets(
+  sheetUrl: string,
+  sheetName?: string
+): Promise<UploadResponse> {
+  return apiFetch<UploadResponse>("/api/import/google-sheets", {
+    method: "POST",
+    body: JSON.stringify({ sheet_url: sheetUrl, sheet_name: sheetName }),
+  });
+}
+
+export async function importFromSQL(
+  connectionString: string,
+  queryOrTable: string,
+  isTable?: boolean,
+  limit?: number
+): Promise<UploadResponse> {
+  return apiFetch<UploadResponse>("/api/import/sql", {
+    method: "POST",
+    body: JSON.stringify({
+      connection_string: connectionString,
+      ...(isTable ? { table: queryOrTable } : { query: queryOrTable }),
+      limit,
+    }),
+  });
+}
+
+export async function importFromDataGovIn(
+  resourceId: string,
+  apiKey: string,
+  limit?: number
+): Promise<UploadResponse> {
+  return apiFetch<UploadResponse>("/api/import/data-gov-in", {
+    method: "POST",
+    body: JSON.stringify({ resource_id: resourceId, api_key: apiKey, limit }),
+  });
+}

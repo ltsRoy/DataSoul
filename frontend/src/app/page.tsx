@@ -13,7 +13,7 @@ const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" }
+    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" as const }
   })
 };
 
@@ -23,9 +23,8 @@ function ThreatMockupCard({ severity, title, impact }: { severity: 'critical' | 
   const badgeClass = `badge-${severity}`;
   return (
     <div className="bg-white border border-[var(--bg-border)] rounded-lg p-4 shadow-sm mb-3">
-      <div className="flex justify-between items-start mb-2">
+      <div className="mb-2">
         <span className={badgeClass}>{severity.toUpperCase()}</span>
-        <button className="text-xs text-[var(--text-muted)] hover:text-[var(--primary)]">Review</button>
       </div>
       <h4 className="font-medium text-[var(--text-primary)] text-sm mb-1">{title}</h4>
       <p className="text-xs text-[var(--text-secondary)]">{impact}</p>
@@ -111,7 +110,7 @@ export default function LandingPage() {
 
               <motion.div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--text-muted)]" variants={fadeUp} custom={3}>
                 <span className="flex items-center gap-1.5"><Lock size={14} /> 100% local processing</span>
-                <span className="flex items-center gap-1.5"><Cpu size={14} /> Ollama + llama3.2</span>
+                <span className="flex items-center gap-1.5"><Cpu size={14} /> Local LLM runtime</span>
                 <span className="flex items-center gap-1.5"><Database size={14} /> ChromaDB RAG</span>
               </motion.div>
             </motion.div>
@@ -147,7 +146,7 @@ export default function LandingPage() {
               What DataSoul does
             </h2>
             <p className="text-lg text-[var(--text-secondary)] max-w-2xl">
-              Every capability runs locally through Ollama and ChromaDB. No API keys, no cloud, no data leaving your machine.
+              Every capability runs locally through the inference runtime and ChromaDB. No API keys, no cloud, no data leaving your machine.
             </p>
           </motion.div>
 
@@ -175,7 +174,7 @@ export default function LandingPage() {
             <CapabilityCard
               icon={FileText}
               title="Executive Narratives"
-              description="Auto-generated boardroom-ready reports with threat summaries, KPI breakdowns, and action plans — streamed via Ollama."
+              description="Boardroom-ready reports with threat summaries, KPI breakdowns, and action plans."
             />
             <CapabilityCard
               icon={Shield}
@@ -264,7 +263,7 @@ export default function LandingPage() {
                   <CheckCircle2 size={18} className="text-[var(--success)]" /> Knowledge base + live data fusion
                 </li>
                 <li className="flex items-center gap-3 text-[var(--text-secondary)]">
-                  <CheckCircle2 size={18} className="text-[var(--success)]" /> Streaming responses via Ollama
+                  <CheckCircle2 size={18} className="text-[var(--success)]" /> Grounded responses from local context
                 </li>
               </ul>
               <a href="/upload" className="text-[var(--primary)] font-medium flex items-center gap-2 hover:gap-3 transition-all">
@@ -287,7 +286,7 @@ export default function LandingPage() {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { icon: Cpu, label: "Ollama", detail: "llama3.2 / Mistral 7B" },
+              { icon: Cpu, label: "Local LLM", detail: "Qwen / Mistral-class models" },
               { icon: Database, label: "ChromaDB", detail: "Vector store for RAG" },
               { icon: Server, label: "FastAPI", detail: "Backend engine" },
               { icon: HardDrive, label: "Local-only", detail: "Zero cloud dependencies" },

@@ -1,8 +1,5 @@
-"""
-DataSoul Threat Detector
-=========================
-Detects data quality, ML, privacy, and business threats
-using patterns from the DataSoul Brain knowledge base.
+"""Detects data quality, ML, privacy, and business threats
+using statistical checks and pattern matching.
 """
 
 import re
@@ -44,7 +41,7 @@ class ThreatDetector:
             "threats": self.threats,
         }
 
-    # ─── MISSING VALUES ───
+
 
     def _detect_missing_value_threats(self):
         for col_profile in self.profile.get("columns", []):
@@ -89,7 +86,7 @@ class ThreatDetector:
                 "actions": actions,
             })
 
-    # ─── DUPLICATES ───
+
 
     def _detect_duplicate_threats(self):
         dup_info = self.profile.get("duplicates", {})
@@ -108,7 +105,7 @@ class ThreatDetector:
                 "actions": ["Review duplicate groups to verify they are true duplicates", "Keep the most recent/complete record", "Investigate ingestion pipeline for duplication source"],
             })
 
-    # ─── INCONSISTENCIES ───
+
 
     def _detect_inconsistency_threats(self):
         for col in self.df.select_dtypes(include=["object"]).columns:
@@ -132,7 +129,7 @@ class ThreatDetector:
                     "actions": ["Standardize to title case", "Merge fuzzy-matched categories (>85% similarity)", "Create canonical mapping dictionary"],
                 })
 
-    # ─── MIXED TYPES ───
+
 
     def _detect_mixed_type_threats(self):
         for col in self.df.select_dtypes(include=["object"]).columns:
@@ -142,6 +139,12 @@ class ThreatDetector:
 
             numeric_count = clean.apply(lambda x: self._is_numeric(str(x))).sum()
             numeric_pct = numeric_count / len(clean) * 100
+
+            col_lower = str(col).lower()
+            if "year" in col_lower:
+                year_like = clean.astype(str).str.match(r"^\d{4}(\s*[-–—]\s*\d{4})?$", na=False).sum()
+                if year_like / len(clean) > 0.8:
+                    continue
 
             if 20 < numeric_pct < 95:
                 self.threats.append({
@@ -155,7 +158,7 @@ class ThreatDetector:
                     "actions": ["Identify and extract the dominant type", "Convert string representations to proper types", "Handle special values ('N/A', 'NULL') as missing"],
                 })
 
-    # ─── OUTLIERS ───
+
 
     def _detect_outlier_threats(self):
         for col_profile in self.profile.get("columns", []):
@@ -176,7 +179,39 @@ class ThreatDetector:
                     "actions": ["Verify if outliers are legitimate or data errors", "Winsorize at 1st/99th percentile for financial data", "Use RobustScaler for ML pipelines"],
                 })
 
-    # ─── ML THREATS ───
+        # --- Cleanlab Advanced OOD Detection for Numeric Columns ---
+        try:
+            from cleanlab.outlier import OutOfDistribution
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                # Need at least 20 valid rows to fit OOD reliably
+                clean_vals = self.df[col].dropna()
+                if len(clean_vals) > 20 and clean_vals.nunique() > 1:
+                    ood = OutOfDistribution()
+                    scores = ood.fit_score(features=clean_vals.values.reshape(-1, 1))
+                    
+                    # Score < 0.15 is generally considered OOD in cleanlab for 1D
+                    ood_mask = scores < 0.15
+                    ood_count = int(np.sum(ood_mask))
+                    
+                    if ood_count > 0:
+                        pct = round((ood_count / len(clean_vals)) * 100, 1)
+                        self.threats.append({
+                            "id": f"cleanlab_ood_{col}",
+                            "severity": "warning" if pct > 1 else "low",
+                            "title": f"Cleanlab OOD Anomalies in '{col}' ({ood_count} values)",
+                            "column": col,
+                            "category": "Anomaly Detection",
+                            "impact": f"Cleanlab detected {ood_count} out-of-distribution values ({pct}%). These are statistically abnormal and may be corrupted data.",
+                            "confidence": 92,
+                            "actions": ["Review flagged OOD rows via Cleanlab integration", "Exclude anomalies from ML training", "Check ingestion sensors for glitches"],
+                        })
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[ThreatDetector] Cleanlab OOD detection failed: {e}")
+
+
 
     def _detect_ml_threats(self):
         corr_info = self.profile.get("correlations", {})
@@ -204,7 +239,7 @@ class ThreatDetector:
                     "actions": ["Consider PCA or feature selection", "Drop one if they measure the same thing", "Use regularization (L1/Lasso)"],
                 })
 
-    # ─── PRIVACY THREATS ───
+
 
     def _detect_privacy_threats(self):
         PII_PATTERNS = {
@@ -235,12 +270,12 @@ class ThreatDetector:
                         "actions": [f"Hash or tokenize {col}", f"Remove {col} if not needed for analysis", "Add governance tag: PII-" + pii_type.upper()],
                     })
 
-    # ─── BUSINESS THREATS ───
+
 
     def _detect_business_threats(self):
         # Check for date columns with gaps
         for col in self.df.columns:
-            if any(kw in col.lower() for kw in ["date", "time", "timestamp"]):
+            if any(kw in col.lower() for kw in ["date", "timestamp", "updated", "created", "reported"]):
                 try:
                     dates = pd.to_datetime(self.df[col], errors="coerce").dropna()
                     if len(dates) > 10:

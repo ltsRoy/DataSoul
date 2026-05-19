@@ -1,9 +1,5 @@
-"""
-DataSoul Backend — FastAPI
-===========================
-Core API server for dataset profiling, threat detection,
-transformation, insights, AI-powered intelligence, RAG,
-knowledge scraping, and iterative data improvement.
+"""FastAPI backend — dataset profiling, threat detection, auto-cleaning,
+AI narratives, RAG chat, predictions, and integrations.
 """
 
 import os
@@ -31,7 +27,7 @@ from csv_corrector import CSVCorrector
 from prediction_engine import PredictionEngine
 from integrations import list_integrations, get_integration
 
-# ─── App Setup ───
+
 app = FastAPI(
     title="DataSoul API",
     description="Intelligent Data Readiness & Business Intelligence Engine with RAG, Iterative Pipeline, CSV Correction & Predictions",
@@ -46,12 +42,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── In-memory session store (replace with DB in prod) ───
+# session store (in-memory; swap for DB in prod)
 sessions: dict = {}
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ─── Initialize engines ───
+# engines
 rag_engine = RAGEngine()
 pipeline = IterativePipeline()
 llm = get_llm()
@@ -59,9 +55,29 @@ csv_corrector = CSVCorrector()
 prediction_engine = PredictionEngine()
 
 
-# ═══════════════════════════════════════════
-# CORE ENDPOINTS
-# ═══════════════════════════════════════════
+def _active_df(session: dict) -> pd.DataFrame:
+    """Return the latest dataframe for the session."""
+    return session.get("df_transformed", session["df"])
+
+
+def _invalidate_analysis_cache(session: dict) -> None:
+    """Drop cached analysis after any dataframe mutation."""
+    session.pop("profile", None)
+    session.pop("threats", None)
+
+
+def _profile_session(session: dict, df: pd.DataFrame | None = None) -> dict:
+    """Build and cache a fresh profile for the latest dataframe."""
+    active = df if df is not None else _active_df(session)
+    profiler = DataProfiler(active)
+    profile = profiler.generate_full_profile()
+    profile["filename"] = session.get("filename", "dataset")
+    profile["sector"] = SectorDetector().detect(active)
+    session["profile"] = profile
+    return profile
+
+
+# --- core endpoints ---
 
 @app.get("/api/health")
 def api_health():
@@ -132,22 +148,13 @@ def get_profile(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    profiler = DataProfiler(session["df"])
-    profile = profiler.generate_full_profile()
-    profile["filename"] = session["filename"]
-
-    # Detect sector
-    detector = SectorDetector()
-    sector_result = detector.detect(session["df"])
-    profile["sector"] = sector_result
-
-    # Cache profile in session
-    session["profile"] = profile
+    df = _active_df(session)
+    profile = _profile_session(session, df)
 
     # Auto-index dataset context into RAG for contextual Q&A
     if rag_engine.is_ready:
         try:
-            rag_engine.ingest_dataset_context(session["df"], profile, session_id)
+            rag_engine.ingest_dataset_context(df, profile, session_id)
         except Exception as e:
             print(f"[DataSoul] Dataset RAG indexing failed (non-critical): {e}")
 
@@ -161,12 +168,9 @@ def get_threats(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    # Get profile if not cached
-    if "profile" not in session:
-        profiler = DataProfiler(session["df"])
-        session["profile"] = profiler.generate_full_profile()
-
-    detector = ThreatDetector(session["df"], session["profile"])
+    df = _active_df(session)
+    profile = _profile_session(session, df)
+    detector = ThreatDetector(df, profile)
     threats = detector.detect_all_threats()
 
     session["threats"] = threats
@@ -180,12 +184,11 @@ def get_strategies(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    if "profile" not in session:
-        profiler = DataProfiler(session["df"])
-        session["profile"] = profiler.generate_full_profile()
+    df = _active_df(session)
+    profile = _profile_session(session, df)
 
     engine = StrategyEngine()
-    strategies = engine.recommend(session["df"], session["profile"])
+    strategies = engine.recommend(df, profile)
 
     session["strategies"] = strategies
     return strategies
@@ -198,7 +201,8 @@ def transform_dataset(session_id: str, actions: dict):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    df = session["df"].copy()
+    df = _active_df(session).copy()
+    input_shape = df.shape
     audit = []
 
     for action in actions.get("approved_actions", []):
@@ -259,10 +263,11 @@ def transform_dataset(session_id: str, actions: dict):
 
     session["df_transformed"] = df
     session["audit_trail"].extend(audit)
+    _invalidate_analysis_cache(session)
 
     return {
         "status": "success",
-        "original_shape": list(session["original_shape"]),
+        "original_shape": list(input_shape),
         "new_shape": list(df.shape),
         "actions_applied": len(audit),
         "audit_trail": audit,
@@ -276,8 +281,10 @@ def get_insights(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    df = session.get("df_transformed", session["df"])
-    profile = session.get("profile")
+    df = _active_df(session)
+    profile = _profile_session(session, df)
+    threats = ThreatDetector(df, profile).detect_all_threats()
+    session["threats"] = threats
 
     if not profile:
         profiler = DataProfiler(df)
@@ -296,8 +303,10 @@ def get_story(session_id: str):
     if not session:
         raise HTTPException(404, "Session not found")
 
-    df = session.get("df_transformed", session["df"])
-    profile = session.get("profile")
+    df = _active_df(session)
+    profile = _profile_session(session, df)
+    threats = ThreatDetector(df, profile).detect_all_threats()
+    session["threats"] = threats
     threats = session.get("threats", {"threats": []})
 
     # Get RAG context for enrichment
@@ -408,29 +417,44 @@ def chat(session_id: str, body: dict):
     if not question:
         raise HTTPException(400, "No question provided")
 
-    df = session.get("df_transformed", session["df"])
+    df = _active_df(session)
+
+    # Use cached profile/threats if available — don't recompute on every question
     profile = session.get("profile")
+    if not profile:
+        profile = _profile_session(session, df)
+
+    threats = session.get("threats")
+    if not threats:
+        threats = ThreatDetector(df, profile).detect_all_threats()
+        session["threats"] = threats
 
     # Get dataset-aware RAG context (combines brain + dataset-specific context)
     rag_context = ""
     if rag_engine.is_ready:
-        rag_context = rag_engine.get_dataset_aware_context(
-            question,
-            session_id=session_id,
-            profile=profile,
-            n_results=3,
-        )
+        try:
+            rag_context = rag_engine.get_dataset_aware_context(
+                question,
+                session_id=session_id,
+                profile=profile,
+                n_results=3,
+            )
+        except Exception:
+            rag_context = ""
 
     engine = NarrativeEngine()
-    answer = engine.answer_question(question, df, profile, rag_context=rag_context)
+    answer = engine.answer_question(question, df, profile, rag_context=rag_context, threats=threats)
 
     # If the base engine gives a default/fallback response, try to augment with RAG
     if rag_context and "No relevant knowledge" not in rag_context and "Try asking" in answer:
         answer += "\n\n---\n\n**From DataSoul Knowledge Base:**\n\n"
-        results = rag_engine.query(question, n_results=2)
-        for r in results:
-            text = r["text"][:300]
-            answer += f"- {text}\n\n"
+        try:
+            results = rag_engine.query(question, n_results=2)
+            for r in results:
+                text = r["text"][:300]
+                answer += f"- {text}\n\n"
+        except Exception:
+            pass
 
     return {"question": question, "answer": answer, "rag_augmented": bool(rag_context), "llm_powered": llm.is_available}
 
@@ -497,9 +521,7 @@ def llm_warmup():
     return {"status": "ready" if success else "failed", "model": llm.get_status()["model"]}
 
 
-# ═══════════════════════════════════════════
-# CSV CORRECTION ENDPOINTS
-# ═══════════════════════════════════════════
+# --- csv correction endpoints ---
 
 @app.post("/api/correct/{session_id}")
 def auto_correct_dataset(session_id: str, body: dict | None = None):
@@ -517,6 +539,7 @@ def auto_correct_dataset(session_id: str, body: dict | None = None):
     if result["corrections_applied"] > 0:
         session["df_transformed"] = result.pop("df")
         session["audit_trail"] = session.get("audit_trail", []) + result["audit"]
+        _invalidate_analysis_cache(session)
     else:
         result.pop("df", None)
 
@@ -553,15 +576,14 @@ def apply_corrections(session_id: str, body: dict):
     if result["corrections_applied"] > 0:
         session["df_transformed"] = result.pop("df")
         session["audit_trail"] = session.get("audit_trail", []) + result["audit"]
+        _invalidate_analysis_cache(session)
     else:
         result.pop("df", None)
 
     return result
 
 
-# ═══════════════════════════════════════════
-# PREDICTION ENDPOINTS
-# ═══════════════════════════════════════════
+# --- prediction endpoints ---
 
 @app.post("/api/predict/{session_id}")
 def predict_missing(session_id: str, body: dict):
@@ -630,9 +652,7 @@ def suggest_features(session_id: str):
     return prediction_engine.suggest_features(df, profile=profile)
 
 
-# ═══════════════════════════════════════════
-# ITERATIVE PIPELINE ENDPOINTS
-# ═══════════════════════════════════════════
+# --- iterative pipeline endpoints ---
 
 @app.post("/api/iterate/{session_id}")
 def iterate_dataset(session_id: str):
@@ -678,9 +698,7 @@ def auto_clean_and_iterate(session_id: str):
     }
 
 
-# ═══════════════════════════════════════════
-# RAG ENDPOINTS
-# ═══════════════════════════════════════════
+# --- rag endpoints ---
 
 @app.get("/api/rag/status")
 def rag_status():
@@ -767,9 +785,7 @@ def rag_ingest_all():
     return results
 
 
-# ═══════════════════════════════════════════
-# DEMO ENDPOINT
-# ═══════════════════════════════════════════
+# --- demo endpoint ---
 
 SAMPLE_DIR = Path("sample_datasets")
 
@@ -814,9 +830,7 @@ def load_demo_dataset(dataset_name: str):
     }
 
 
-# ═══════════════════════════════════════════
-# EXPORT ENDPOINTS
-# ═══════════════════════════════════════════
+# --- export endpoints ---
 
 @app.get("/api/export/{session_id}/{format}")
 def export_dataset(session_id: str, format: str):
@@ -854,9 +868,7 @@ def download_file(filename: str):
     return FileResponse(path=str(file_path), filename=filename)
 
 
-# ═══════════════════════════════════════════
-# INTEGRATION ENDPOINTS
-# ═══════════════════════════════════════════
+# --- integration endpoints ---
 
 @app.get("/api/integrations")
 def get_integrations():
@@ -940,7 +952,12 @@ def import_kaggle(body: dict):
         raise HTTPException(503, "Kaggle integration not available")
 
     dataset_slug = body.get("dataset_slug", "")
-    credentials = body.get("credentials", {})
+    # Credentials can be passed as { username, key } from the frontend
+    raw_creds = body.get("credentials") or {}
+    if isinstance(raw_creds, dict) and raw_creds.get("username") and raw_creds.get("key"):
+        credentials = {"username": raw_creds["username"], "key": raw_creds["key"]}
+    else:
+        credentials = None  # fall back to env vars / kaggle.json
 
     if not dataset_slug:
         raise HTTPException(400, "dataset_slug is required (e.g., 'username/dataset-name')")
@@ -951,8 +968,9 @@ def import_kaggle(body: dict):
         raise HTTPException(400, f"Import failed: {e}")
 
     session_id = str(uuid.uuid4())[:8]
+    dataset_name = dataset_slug.split("/")[-1] if "/" in dataset_slug else dataset_slug
     sessions[session_id] = {
-        "filename": f"kaggle_{dataset_slug.split('/')[-1]}.csv",
+        "filename": f"kaggle_{dataset_name}.csv",
         "file_path": "kaggle",
         "df": df,
         "original_shape": df.shape,
@@ -960,7 +978,20 @@ def import_kaggle(body: dict):
         "iteration_count": 0,
         "source": "kaggle",
     }
-    return {"session_id": session_id, "filename": dataset_slug, "rows": df.shape[0], "cols": df.shape[1], "columns": list(df.columns)}
+    try:
+        size_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2)
+    except Exception:
+        size_mb = 0.0
+
+    return {
+        "session_id": session_id,
+        "filename": f"kaggle_{dataset_name}.csv",
+        "rows": df.shape[0],
+        "cols": df.shape[1],
+        "columns": list(df.columns),
+        "size_mb": size_mb,
+    }
+
 
 
 @app.post("/api/import/sql")
@@ -1111,18 +1142,21 @@ def export_to_kaggle(session_id: str, body: dict):
         raise HTTPException(400, f"Export failed: {e}")
 
 
-# ─── Startup Event ───
+# startup
 @app.on_event("startup")
 async def startup_event():
     """Auto-ingest brain knowledge on startup"""
     try:
         if rag_engine.is_ready:
             status = rag_engine.get_status()
-            if status["total_documents"] == 0:
-                print("[DataSoul] First boot -- ingesting brain knowledge base...")
-                result = rag_engine.ingest_brain_knowledge()
-                print(f"[DataSoul] Brain ingested: {result.get('documents_ingested', 0)} documents")
+            print("[DataSoul] Syncing brain knowledge base...")
+            result = rag_engine.ingest_brain_knowledge()
+            print(
+                f"[DataSoul] Brain sync: {result.get('documents_ingested', 0)} chunks, "
+                f"{result.get('files_updated', 0)} updated, {result.get('files_skipped', 0)} unchanged"
+            )
 
+            if status["total_documents"] == 0:
                 # Generate and ingest builtin knowledge (no live scraping at startup)
                 try:
                     scraper = KnowledgeScraper()
@@ -1140,14 +1174,14 @@ async def startup_event():
 
                 print(f"[DataSoul] RAG ready with {rag_engine.get_status()['total_documents']} total documents")
             else:
-                print(f"[DataSoul] RAG loaded with {status['total_documents']} documents")
+                print(f"[DataSoul] RAG loaded with {rag_engine.get_status()['total_documents']} documents")
         else:
             print("[DataSoul] ChromaDB not available -- RAG features disabled")
     except Exception as e:
         print(f"[DataSoul] Startup RAG init failed (non-critical): {e}")
 
 
-# ─── Run ───
+# run
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

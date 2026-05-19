@@ -11,6 +11,15 @@ from typing import Any
 
 
 class DataProfiler:
+    @staticmethod
+    def _safe_float(val, default=0.0):
+        if pd.isna(val):
+            return default
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
     def __init__(self, df: pd.DataFrame):
         self.df = df
         self.rows, self.cols = df.shape
@@ -70,15 +79,15 @@ class DataProfiler:
                 clean = series.dropna()
                 if len(clean) > 0:
                     profile["stats"] = {
-                        "mean": round(float(clean.mean()), 2),
-                        "median": round(float(clean.median()), 2),
-                        "std": round(float(clean.std()), 2),
-                        "min": round(float(clean.min()), 2),
-                        "max": round(float(clean.max()), 2),
-                        "q1": round(float(clean.quantile(0.25)), 2),
-                        "q3": round(float(clean.quantile(0.75)), 2),
-                        "skewness": round(float(clean.skew()), 3),
-                        "kurtosis": round(float(clean.kurtosis()), 3),
+                        "mean": round(self._safe_float(clean.mean()), 2),
+                        "median": round(self._safe_float(clean.median()), 2),
+                        "std": round(self._safe_float(clean.std()), 2),
+                        "min": round(self._safe_float(clean.min()), 2),
+                        "max": round(self._safe_float(clean.max()), 2),
+                        "q1": round(self._safe_float(clean.quantile(0.25)), 2),
+                        "q3": round(self._safe_float(clean.quantile(0.75)), 2),
+                        "skewness": round(self._safe_float(clean.skew()), 3),
+                        "kurtosis": round(self._safe_float(clean.kurtosis()), 3),
                     }
                     # Outlier detection (IQR)
                     q1, q3 = clean.quantile(0.25), clean.quantile(0.75)
@@ -89,12 +98,14 @@ class DataProfiler:
                     profile["outliers"] = {
                         "count": int(len(outliers)),
                         "pct": round(len(outliers) / len(clean) * 100, 2),
-                        "lower_bound": round(float(lower), 2),
-                        "upper_bound": round(float(upper), 2),
+                        "lower_bound": round(self._safe_float(lower), 2),
+                        "upper_bound": round(self._safe_float(upper), 2),
                     }
                     # Distribution type
                     skew = clean.skew()
-                    if abs(skew) < 0.5:
+                    if pd.isna(skew):
+                        profile["distribution"] = "unknown"
+                    elif abs(skew) < 0.5:
                         profile["distribution"] = "approximately_normal"
                     elif skew > 0.5:
                         profile["distribution"] = "right_skewed"
@@ -108,7 +119,7 @@ class DataProfiler:
                     top = clean.value_counts().head(5)
                     profile["top_values"] = {str(k): int(v) for k, v in top.items()}
                     profile["mode"] = str(clean.mode().iloc[0]) if not clean.mode().empty else None
-                    profile["mode_frequency"] = round(float(top.iloc[0] / len(clean) * 100), 2) if len(top) > 0 else 0
+                    profile["mode_frequency"] = round(self._safe_float(top.iloc[0] / len(clean) * 100), 2) if len(top) > 0 else 0
 
                     # Check for mixed types
                     numeric_parseable = clean.apply(lambda x: self._is_numeric_string(str(x))).sum()
@@ -232,7 +243,7 @@ class DataProfiler:
                 })
 
             # Check: currency symbols that prevent numeric parsing
-            has_currency = clean.str.contains(r'[\$\u20b9\u00a3\u20ac\u00a5]', regex=True, na=False).sum()
+            has_currency = clean.str.contains(r'[\$₹£€¥]', regex=True, na=False).sum()
             currency_ratio = has_currency / len(clean)
             if currency_ratio > 0.3:
                 type_penalty += currency_ratio * 15
@@ -258,7 +269,8 @@ class DataProfiler:
         # Accuracy (10%) — near-zero variance, constant columns
         accuracy_penalty = 0
         for col in self.df.select_dtypes(include=[np.number]).columns:
-            if self.df[col].std() < 0.001 and self.df[col].notna().sum() > 0:
+            std_val = self.df[col].std()
+            if pd.notna(std_val) and std_val < 0.001 and self.df[col].notna().sum() > 0:
                 accuracy_penalty += 10
         # Also penalize columns where all values are the same string
         for col in self.df.select_dtypes(include=["object"]).columns:
@@ -269,8 +281,14 @@ class DataProfiler:
         # Timeliness (15%) — check for date columns and recency
         timeliness = 90  # Default good if no date columns
         for col in self.df.columns:
+            col_lower = str(col).lower()
+            if not any(kw in col_lower for kw in ["date", "timestamp", "updated", "created", "reported"]):
+                continue
+            series = self.df[col]
+            if pd.api.types.is_numeric_dtype(series):
+                continue
             try:
-                parsed = pd.to_datetime(self.df[col], errors="coerce", infer_datetime_format=True)
+                parsed = pd.to_datetime(series, errors="coerce")
                 if parsed.notna().sum() > len(self.df) * 0.5:
                     # Found a date column — check recency
                     max_date = parsed.max()

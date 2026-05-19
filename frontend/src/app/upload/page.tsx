@@ -6,9 +6,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   Upload, FileSpreadsheet, FileText, X, CheckCircle2,
   Activity, ArrowLeft, Sparkles, Database, ChevronRight,
-  AlertCircle, Loader2, FileUp, Table
+  AlertCircle, Loader2, FileUp, Table, Globe, Terminal
 } from "lucide-react";
-import { uploadFile, loadDemo, type UploadResponse } from "../api";
+import { uploadFile, loadDemo, importFromKaggle, importFromGoogleSheets, type UploadResponse } from "../api";
 import { useSession } from "../useSession";
 
 /* ─── Sample datasets for demo ─── */
@@ -52,6 +52,10 @@ function UploadPageContent() {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
+  const [importInput, setImportInput] = useState("");
+  const [activeImport, setActiveImport] = useState<string | null>(null);
+  const [kaggleUsername, setKaggleUsername] = useState("");
+  const [kaggleKey, setKaggleKey] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -117,6 +121,52 @@ function UploadPageContent() {
       }, 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load demo. Is the backend running on localhost:8000?");
+      setIsUploading(false);
+      setUploadStep(0);
+      setFile(null);
+    }
+  };
+
+  const handleIntegrationImport = async () => {
+    if (!importInput.trim() || !activeImport) return;
+    // Kaggle requires credentials
+    if (activeImport === "kaggle" && (!kaggleUsername.trim() || !kaggleKey.trim())) {
+      setError("Please enter your Kaggle username and API key.");
+      return;
+    }
+    setError(null);
+    setFile(new File(["import"], `${activeImport}_import.csv`, { type: "text/csv" }));
+    setIsUploading(true);
+    setUploadStep(1);
+
+    try {
+      let result: UploadResponse;
+      if (activeImport === "kaggle") {
+        result = await importFromKaggle(importInput.trim(), undefined, {
+          username: kaggleUsername.trim(),
+          key: kaggleKey.trim(),
+        });
+      } else if (activeImport === "google-sheets") {
+        result = await importFromGoogleSheets(importInput.trim());
+      } else {
+        throw new Error("Integration not yet implemented");
+      }
+      setUploadResult(result);
+      setUploadStep(2);
+      setSession(result.session_id, result.filename);
+      await new Promise(r => setTimeout(r, 800));
+      setUploadStep(3);
+      setUploadComplete(true);
+      setIsUploading(false);
+      setActiveImport(null);
+      setImportInput("");
+      setKaggleUsername("");
+      setKaggleKey("");
+      setTimeout(() => {
+        router.push(`/health?session=${result.session_id}`);
+      }, 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed. Check the slug/URL and try again.");
       setIsUploading(false);
       setUploadStep(0);
       setFile(null);
@@ -217,6 +267,7 @@ function UploadPageContent() {
 
         {/* ─── Dropzone ─── */}
         {!isDemo && !file && (
+          <>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }}>
             <div
               className={`dropzone ${isDragging ? "active" : ""}`}
@@ -258,6 +309,100 @@ function UploadPageContent() {
               </a>
             </div>
           </motion.div>
+
+          {/* Integrations */}
+          <motion.div className="mt-10" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Globe size={14} /> Or import from
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { id: "kaggle", name: "Kaggle", color: "#20BEFF", placeholder: "username/dataset-name or URL" },
+                { id: "google-sheets", name: "Google Sheets", color: "#34a853", placeholder: "https://docs.google.com/spreadsheets/d/..." },
+                { id: "sql", name: "SQL Database", color: "#f59e0b", placeholder: "connection string", disabled: true },
+                { id: "data-gov-in", name: "data.gov.in", color: "#FF6B35", placeholder: "resource ID", disabled: true },
+              ].map((src) => (
+                <button
+                  key={src.id}
+                  className="glass-card text-center py-4 transition-all hover:scale-[1.02]"
+                  style={{ cursor: src.disabled ? "not-allowed" : "pointer", opacity: src.disabled ? 0.5 : 1 }}
+                  onClick={() => { if (!src.disabled) { setActiveImport(src.id); setImportInput(""); } }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-2" style={{ background: `${src.color}15`, border: `1px solid ${src.color}25` }}>
+                    {src.id === "sql" ? <Terminal size={16} style={{ color: src.color }} /> : <Database size={16} style={{ color: src.color }} />}
+                  </div>
+                  <span className="text-xs font-medium">{src.name}</span>
+                  {src.disabled && <span className="block text-[10px] text-[var(--text-muted)] mt-1">Coming Soon</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* Import input modal */}
+            <AnimatePresence>
+              {activeImport && (
+                <motion.div
+                  className="glass-card mt-4"
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold">Import from {activeImport === "kaggle" ? "Kaggle" : "Google Sheets"}</h4>
+                    <button onClick={() => { setActiveImport(null); setKaggleUsername(""); setKaggleKey(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Kaggle credential fields */}
+                  {activeImport === "kaggle" && (
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={kaggleUsername}
+                        onChange={(e) => setKaggleUsername(e.target.value)}
+                        placeholder="Kaggle username"
+                        className="text-sm px-4 py-2.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] outline-none focus:border-[var(--primary)] transition-colors"
+                      />
+                      <input
+                        type="password"
+                        value={kaggleKey}
+                        onChange={(e) => setKaggleKey(e.target.value)}
+                        placeholder="API key (from kaggle.json)"
+                        className="text-sm px-4 py-2.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] outline-none focus:border-[var(--primary)] transition-colors"
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={importInput}
+                      onChange={(e) => setImportInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleIntegrationImport()}
+                      placeholder={activeImport === "kaggle" ? "Dataset slug or full Kaggle URL" : "Paste Google Sheets URL..."}
+                      className="flex-1 text-sm px-4 py-2.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] outline-none focus:border-[var(--primary)] transition-colors"
+                    />
+                    <button
+                      onClick={handleIntegrationImport}
+                      disabled={!importInput.trim() || isUploading || (activeImport === "kaggle" && (!kaggleUsername.trim() || !kaggleKey.trim()))}
+                      className="btn-primary text-sm px-5"
+                    >
+                      {isUploading ? <Loader2 size={16} className="animate-spin" /> : "Import"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mt-2">
+                    {activeImport === "kaggle"
+                      ? <>
+                          Enter username &amp; API key from{" "}
+                          <a href="https://www.kaggle.com/settings/account" target="_blank" rel="noopener noreferrer" className="underline text-[var(--primary)]">kaggle.com/settings → API → Create New Token</a>.
+                          Paste a dataset slug (e.g. <code className="text-[10px]">owner/name</code>) or full Kaggle URL.
+                        </>
+                      : "Paste a public Google Sheets URL. The sheet must be shared as 'Anyone with the link'."
+                    }
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+          </>
         )}
 
         {/* ─── Upload Progress ─── */}

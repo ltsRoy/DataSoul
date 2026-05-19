@@ -1,9 +1,5 @@
-"""
-DataSoul RAG Engine
-=====================
-ChromaDB-powered Retrieval Augmented Generation engine.
-Ingests the entire DataSoul brain knowledge base + scraped external
-knowledge and provides semantic search for context-aware AI responses.
+"""ChromaDB-backed RAG store. Indexes brain knowledge + dataset context
+for semantic search across chat and narrative generation.
 """
 
 import os
@@ -21,6 +17,7 @@ except ImportError:
 
 BRAIN_DIR = Path(__file__).parent.parent / "datasoul_brain"
 RAG_PERSIST_DIR = Path(__file__).parent / "rag_store"
+SUPPORTED_BRAIN_EXTENSIONS = {".json", ".jsonl", ".md", ".markdown"}
 
 
 class RAGEngine:
@@ -58,6 +55,77 @@ class RAGEngine:
     # ─── INGESTION ───
 
     def ingest_brain_knowledge(self) -> dict:
+        return self._ingest_brain_knowledge_delta()
+
+    def _ingest_brain_knowledge_delta(self) -> dict:
+        """Delta-ingest JSON, JSONL, and Markdown files from datasoul_brain."""
+        if not self.is_ready:
+            return {"status": "error", "message": "ChromaDB not initialized"}
+
+        ingested = 0
+        updated = 0
+        skipped = 0
+        removed = 0
+        sources = []
+        manifest = self._load_manifest()
+        next_manifest = {}
+
+        brain_files = list(self._iter_brain_files())
+        current_sources = {str(path.relative_to(BRAIN_DIR)).replace("\\", "/") for path in brain_files}
+
+        for stale_source in set(manifest) - current_sources:
+            try:
+                self.collection.delete(where={"source": stale_source})
+                removed += 1
+            except Exception as e:
+                print(f"[RAG] Failed to remove stale source {stale_source}: {e}")
+
+        for file_path in brain_files:
+            rel_path = str(file_path.relative_to(BRAIN_DIR)).replace("\\", "/")
+            try:
+                file_hash = self._hash_file(file_path)
+                next_manifest[rel_path] = file_hash
+
+                if manifest.get(rel_path) == file_hash and self._source_has_documents(rel_path):
+                    skipped += 1
+                    sources.append(rel_path)
+                    continue
+
+                try:
+                    self.collection.delete(where={"source": rel_path})
+                except Exception:
+                    pass
+
+                chunks = self._extract_chunks_from_file(file_path, rel_path, file_hash)
+                documents = [chunk["text"] for chunk in chunks]
+                metadatas = [self._clean_metadata(chunk["metadata"]) for chunk in chunks]
+                ids = [
+                    self._make_id(f"{rel_path}:{file_hash}:{i}:{chunk['text'][:80]}")
+                    for i, chunk in enumerate(chunks)
+                ]
+
+                if documents:
+                    self.collection.add(documents=documents, metadatas=metadatas, ids=ids)
+                    ingested += len(documents)
+                    updated += 1
+                sources.append(rel_path)
+            except Exception as e:
+                print(f"[RAG] Failed to ingest {file_path}: {e}")
+
+        self._stats["total_documents"] = self.collection.count()
+        self._stats["sources"] = sources
+        self._save_manifest(next_manifest)
+
+        return {
+            "status": "success",
+            "documents_ingested": ingested,
+            "files_updated": updated,
+            "files_skipped": skipped,
+            "files_removed": removed,
+            "total_in_index": self.collection.count(),
+            "sources": sources,
+        }
+
         """Ingest all JSON files from datasoul_brain directory"""
         if not self.is_ready:
             return {"status": "error", "message": "ChromaDB not initialized"}
@@ -417,6 +485,146 @@ class RAGEngine:
             return {"status": "error", "message": str(e)}
 
     # ─── HELPERS ───
+
+    @property
+    def _manifest_path(self) -> Path:
+        return self.persist_dir / "brain_manifest.json"
+
+    def _load_manifest(self) -> dict:
+        try:
+            if self._manifest_path.exists():
+                with open(self._manifest_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data if isinstance(data, dict) else {}
+        except Exception as e:
+            print(f"[RAG] Failed to load brain manifest: {e}")
+        return {}
+
+    def _save_manifest(self, manifest: dict) -> None:
+        try:
+            with open(self._manifest_path, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2, sort_keys=True)
+        except Exception as e:
+            print(f"[RAG] Failed to save brain manifest: {e}")
+
+    @staticmethod
+    def _hash_file(path: Path) -> str:
+        digest = hashlib.md5()
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _iter_brain_files():
+        if not BRAIN_DIR.exists():
+            return
+        for path in sorted(BRAIN_DIR.rglob("*")):
+            if path.is_file() and path.suffix.lower() in SUPPORTED_BRAIN_EXTENSIONS:
+                yield path
+
+    def _source_has_documents(self, source: str) -> bool:
+        try:
+            existing = self.collection.get(where={"source": source}, limit=1)
+            return bool(existing and existing.get("ids"))
+        except Exception:
+            return False
+
+    def _extract_chunks_from_file(self, path: Path, source: str, file_hash: str) -> list[dict]:
+        suffix = path.suffix.lower()
+        if suffix == ".json":
+            with open(path, "r", encoding="utf-8") as f:
+                return self._stamp_chunks(
+                    self._extract_chunks_from_json(json.load(f), source=source),
+                    source,
+                    file_hash,
+                )
+        if suffix == ".jsonl":
+            return self._extract_chunks_from_jsonl(path, source, file_hash)
+        if suffix in {".md", ".markdown"}:
+            return self._extract_chunks_from_markdown(path, source, file_hash)
+        return []
+
+    def _extract_chunks_from_jsonl(self, path: Path, source: str, file_hash: str) -> list[dict]:
+        chunks = []
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if not content:
+            return []
+        try:
+            entries = json.loads(content)
+            if not isinstance(entries, list):
+                entries = [entries]
+        except json.JSONDecodeError:
+            entries = [json.loads(line) for line in content.splitlines() if line.strip()]
+
+        for i, entry in enumerate(entries):
+            if isinstance(entry, dict) and {"instruction", "input", "output"} & set(entry):
+                text = (
+                    f"INSTRUCTION: {entry.get('instruction', '')}\n"
+                    f"INPUT: {entry.get('input', '')}\n"
+                    f"OUTPUT: {entry.get('output', '')}"
+                )
+                chunks.append({
+                    "text": text,
+                    "metadata": {
+                        "source": source,
+                        "type": "few_shot_example",
+                        "path": f"[{i}]",
+                        "file_hash": file_hash,
+                    },
+                })
+            else:
+                chunks.extend(self._extract_chunks_from_json(entry, source, f"[{i}]"))
+        return self._stamp_chunks(chunks, source, file_hash)
+
+    def _extract_chunks_from_markdown(self, path: Path, source: str, file_hash: str) -> list[dict]:
+        text = path.read_text(encoding="utf-8")
+        chunks = []
+        current_title = "document"
+        current_lines = []
+
+        def flush():
+            body = "\n".join(current_lines).strip()
+            if len(body) >= 40:
+                chunks.append({
+                    "text": f"{current_title}\n{body}",
+                    "metadata": {
+                        "source": source,
+                        "type": "brain_markdown",
+                        "path": current_title,
+                        "file_hash": file_hash,
+                    },
+                })
+
+        for line in text.splitlines():
+            if line.startswith("#"):
+                flush()
+                current_title = line.strip("# ").strip() or "section"
+                current_lines = []
+            else:
+                current_lines.append(line)
+        flush()
+        return chunks
+
+    @staticmethod
+    def _stamp_chunks(chunks: list[dict], source: str, file_hash: str) -> list[dict]:
+        for i, chunk in enumerate(chunks):
+            metadata = chunk.setdefault("metadata", {})
+            metadata["source"] = source
+            metadata["file_hash"] = file_hash
+            metadata["chunk_index"] = i
+        return chunks
+
+    @staticmethod
+    def _clean_metadata(metadata: dict) -> dict:
+        clean_meta = {}
+        for k, v in metadata.items():
+            if isinstance(v, (str, int, float, bool)):
+                clean_meta[k] = v
+            else:
+                clean_meta[k] = str(v)
+        return clean_meta
 
     def _extract_chunks_from_json(self, data: dict | list, source: str, prefix: str = "") -> list[dict]:
         """Recursively extract text chunks from nested JSON structures"""

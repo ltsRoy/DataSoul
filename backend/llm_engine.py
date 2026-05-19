@@ -1,27 +1,42 @@
-"""
-DataSoul — LLM Engine
-========================
-Local LLM client using Ollama REST API for generating intelligent narratives,
-conversational Q&A, and dataset-specific insights.
-
-Architecture:
-  1. Ollama must be running locally (ollama serve)
-  2. At least one model must be pulled (ollama pull llama3.2)
-  3. RAG context from ChromaDB is injected into every prompt
-  4. Falls back to template engine if Ollama is unavailable
-
-Uses direct HTTP calls to Ollama REST API (http://localhost:11434)
-instead of the `ollama` Python library to avoid import-hang issues.
-
-Supports: streaming, multi-turn chat, RAG-augmented generation.
+"""Local LLM client — talks to Ollama via REST for narratives, chat, and corrections.
+Falls back to template engine when Ollama is unavailable.
 """
 
 import json
+import asyncio
 import time
-import requests
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Generator
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
+try:
+    import httpx
+except ImportError:
+    httpx = None
+
 OLLAMA_BASE = "http://localhost:11434"
+_KEEP_ALIVE = "60m"
+_HTTP_LIMITS = httpx.Limits(max_connections=8, max_keepalive_connections=4) if httpx else None
+_CONNECT_ERRORS = tuple(
+    exc for exc in [
+        getattr(requests, "ConnectionError", None) if requests else None,
+        getattr(httpx, "ConnectError", None) if httpx else None,
+        urllib.error.URLError,
+    ] if exc
+)
+_TIMEOUT_ERRORS = tuple(
+    exc for exc in [
+        getattr(requests, "Timeout", None) if requests else None,
+        getattr(httpx, "TimeoutException", None) if httpx else None,
+        TimeoutError,
+    ] if exc
+)
 _LLM_TIMEOUT = 120  # seconds — Ollama on consumer hardware needs time for long generations
 _CONNECT_TIMEOUT = 5  # seconds — fast-fail if Ollama isn't running
 
@@ -29,8 +44,13 @@ _CONNECT_TIMEOUT = 5  # seconds — fast-fail if Ollama isn't running
 class LLMEngine:
     """Ollama-powered LLM client with graceful fallback (REST API)"""
 
-    DEFAULT_MODEL = "llama3.2"
-    FALLBACK_MODELS = ["llama3.1", "llama3", "mistral", "phi3", "gemma2", "qwen2", "deepseek-r1"]
+    DEFAULT_MODEL = "qwen2.5:7b"
+    FALLBACK_MODELS = [
+        "qwen2.5:7b", "qwen2.5", "qwen2.5:1.5b",  # best for data tasks
+        "llama3.2:3b", "llama3.2", "llama3.1", "llama3",
+        "mistral", "phi3", "gemma2", "gemma3",
+        "qwen2", "qwen2.5-coder", "deepseek-r1",
+    ]
 
     # DataSoul system persona — injected into every conversation
     SYSTEM_PERSONA = """You are **DataSoul AI** — India's premier data intelligence analyst.
@@ -54,12 +74,22 @@ RULES:
     def _init_client(self):
         """Initialize by querying Ollama REST API for available models"""
         try:
-            resp = requests.get(
-                f"{OLLAMA_BASE}/api/tags",
-                timeout=_CONNECT_TIMEOUT,
-            )
-            resp.raise_for_status()
-            data = resp.json()
+            if httpx:
+                resp = httpx.get(
+                    f"{OLLAMA_BASE}/api/tags",
+                    timeout=_CONNECT_TIMEOUT,
+                )
+            elif requests:
+                resp = requests.get(
+                    f"{OLLAMA_BASE}/api/tags",
+                    timeout=_CONNECT_TIMEOUT,
+                )
+            else:
+                resp = None
+                data = self._urllib_json("GET", f"{OLLAMA_BASE}/api/tags")
+            if resp is not None:
+                resp.raise_for_status()
+                data = resp.json()
 
             models_list = data.get("models", [])
             installed = {}
@@ -102,10 +132,10 @@ RULES:
             else:
                 print(f"[LLM] Ollama running but no models found. Run: ollama pull {self.DEFAULT_MODEL}")
 
-        except requests.ConnectionError:
+        except _CONNECT_ERRORS:
             print("[LLM] Ollama not running. Start it: ollama serve")
             self._available = False
-        except requests.Timeout:
+        except _TIMEOUT_ERRORS:
             print("[LLM] Ollama connection timed out")
             self._available = False
         except Exception as e:
@@ -127,13 +157,12 @@ RULES:
             "quantization": self._model_info.get("quantization", ""),
         }
 
-    # ─── CORE GENERATION ───
+    # -- generation --
 
-    def generate(self, prompt: str, system: str | None = None,
-                 temperature: float = 0.7, max_tokens: int = 2000,
-                 timeout: int | None = None) -> str:
-        """Generate text from a prompt. Returns empty string if LLM unavailable.
-        timeout: seconds to wait before aborting (default: _LLM_TIMEOUT)."""
+    async def agenerate(self, prompt: str, system: str | None = None,
+                        temperature: float = 0.7, max_tokens: int = 2000,
+                        timeout: int | None = None, json_mode: bool = False) -> str:
+        """Generate text with the non-blocking Ollama client."""
         if not self._available:
             return ""
 
@@ -142,35 +171,93 @@ RULES:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        try:
-            resp = requests.post(
-                f"{OLLAMA_BASE}/api/chat",
-                json={
-                    "model": self._active_model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": max_tokens,
-                    },
-                    "keep_alive": "5m",
-                },
-                timeout=(_CONNECT_TIMEOUT, timeout or _LLM_TIMEOUT),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("message", {}).get("content", "")
+        payload = {
+            "model": self._active_model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+            "keep_alive": _KEEP_ALIVE,
+        }
+        if json_mode:
+            payload["format"] = "json"
 
-        except requests.Timeout:
+        try:
+            if not httpx:
+                return await asyncio.to_thread(self._generate_with_requests, payload, timeout)
+
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout or _LLM_TIMEOUT, connect=_CONNECT_TIMEOUT),
+                limits=_HTTP_LIMITS,
+            ) as client:
+                resp = await client.post(f"{OLLAMA_BASE}/api/chat", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("message", {}).get("content", "")
+
+        except _TIMEOUT_ERRORS:
             print(f"[LLM] Generation timed out after {timeout or _LLM_TIMEOUT}s")
             return ""
-        except requests.ConnectionError:
+        except _CONNECT_ERRORS:
             print("[LLM] Ollama connection lost during generation")
             self._available = False
             return ""
         except Exception as e:
             print(f"[LLM] Generation error: {e}")
             return ""
+
+    def _generate_with_requests(self, payload: dict, timeout: int | None = None) -> str:
+        if requests:
+            resp = requests.post(
+                f"{OLLAMA_BASE}/api/chat",
+                json=payload,
+                timeout=(_CONNECT_TIMEOUT, timeout or _LLM_TIMEOUT),
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        else:
+            data = self._urllib_json("POST", f"{OLLAMA_BASE}/api/chat", payload, timeout or _LLM_TIMEOUT)
+        return data.get("message", {}).get("content", "")
+
+    @staticmethod
+    def _urllib_json(method: str, url: str, payload: dict | None = None, timeout: int | None = None) -> dict:
+        body = json.dumps(payload).encode("utf-8") if payload is not None else None
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method=method,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout or _CONNECT_TIMEOUT) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def generate(self, prompt: str, system: str | None = None,
+                 temperature: float = 0.7, max_tokens: int = 2000,
+                 timeout: int | None = None, json_mode: bool = False) -> str:
+        """Sync compatibility wrapper around agenerate."""
+        return self._run_async(
+            lambda: self.agenerate(
+                prompt,
+                system=system,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                json_mode=json_mode,
+            )
+        )
+
+    @staticmethod
+    def _run_async(coro_factory):
+        """Run async generation from legacy sync call sites."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro_factory())
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(lambda: asyncio.run(coro_factory())).result()
 
     def generate_stream(self, prompt: str, system: str | None = None,
                         temperature: float = 0.7, max_tokens: int = 2000) -> Generator[str, None, None]:
@@ -184,45 +271,91 @@ RULES:
         messages.append({"role": "user", "content": prompt})
 
         try:
-            resp = requests.post(
-                f"{OLLAMA_BASE}/api/chat",
-                json={
+            if not httpx and requests:
+                resp = requests.post(
+                    f"{OLLAMA_BASE}/api/chat",
+                    json={
+                        "model": self._active_model,
+                        "messages": messages,
+                        "stream": True,
+                        "options": {
+                            "temperature": temperature,
+                            "num_predict": max_tokens,
+                        },
+                        "keep_alive": _KEEP_ALIVE,
+                    },
+                    timeout=(_CONNECT_TIMEOUT, _LLM_TIMEOUT),
+                    stream=True,
+                )
+                resp.raise_for_status()
+                for line in resp.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                        token = chunk.get("message", {}).get("content", "")
+                        if token:
+                            yield token
+                        if chunk.get("done", False):
+                            break
+                    except json.JSONDecodeError:
+                        continue
+                return
+            if not httpx:
+                payload = {
                     "model": self._active_model,
                     "messages": messages,
-                    "stream": True,
+                    "stream": False,
                     "options": {
                         "temperature": temperature,
                         "num_predict": max_tokens,
                     },
-                    "keep_alive": "5m",
-                },
-                timeout=(_CONNECT_TIMEOUT, _LLM_TIMEOUT),
-                stream=True,
-            )
-            resp.raise_for_status()
+                    "keep_alive": _KEEP_ALIVE,
+                }
+                content = self._generate_with_requests(payload)
+                if content:
+                    yield content
+                return
 
-            for line in resp.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                try:
-                    chunk = json.loads(line)
-                    token = chunk.get("message", {}).get("content", "")
-                    if token:
-                        yield token
-                    if chunk.get("done", False):
-                        break
-                except json.JSONDecodeError:
-                    continue
+            with httpx.Client(timeout=httpx.Timeout(_LLM_TIMEOUT, connect=_CONNECT_TIMEOUT)) as client:
+                with client.stream(
+                    "POST",
+                    f"{OLLAMA_BASE}/api/chat",
+                    json={
+                        "model": self._active_model,
+                        "messages": messages,
+                        "stream": True,
+                        "options": {
+                            "temperature": temperature,
+                            "num_predict": max_tokens,
+                        },
+                        "keep_alive": _KEEP_ALIVE,
+                    },
+                ) as resp:
+                    resp.raise_for_status()
 
-        except requests.Timeout:
+                    for line in resp.iter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                            token = chunk.get("message", {}).get("content", "")
+                            if token:
+                                yield token
+                            if chunk.get("done", False):
+                                break
+                        except json.JSONDecodeError:
+                            continue
+
+        except _TIMEOUT_ERRORS:
             print(f"[LLM] Stream timed out after {_LLM_TIMEOUT}s")
-        except requests.ConnectionError:
+        except _CONNECT_ERRORS:
             print("[LLM] Ollama connection lost during streaming")
             self._available = False
         except Exception as e:
             print(f"[LLM] Stream error: {e}")
 
-    # ─── RAG-AUGMENTED METHODS ───
+    # -- rag-augmented methods --
 
     def generate_narrative(self, profile: dict, threats: dict,
                            df_summary: dict, rag_context: str = "") -> str:
@@ -335,7 +468,7 @@ Answer:"""
 
         yield from self.generate_stream(prompt, system=system, temperature=0.3, max_tokens=1500)
 
-    # ─── CSV CORRECTION PROMPTS ───
+    # -- csv correction prompts --
 
     def correct_values(self, column_name: str, sample_values: list[str],
                        context: str = "") -> str:
@@ -394,7 +527,7 @@ Format your response as a numbered list matching the inputs."""
 
         return self.generate(prompt, system=self.SYSTEM_PERSONA, temperature=0.2, max_tokens=500)
 
-    # ─── HELPERS ───
+    # -- helpers --
 
     @staticmethod
     def _format_rag_section(rag_context: str) -> str:
@@ -417,7 +550,7 @@ Use this context to enrich your response where relevant."""
             return False
 
 
-# ─── Singleton instance ───
+# singleton
 _llm_instance: LLMEngine | None = None
 
 

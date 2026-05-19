@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import {
   getProfile, getThreats, autoClean, chatWithData,
-  analyzeCorrections, applyCorrections,
+  analyzeCorrections, applyCorrections, getLLMStatus,
   type ProfileResponse, type ThreatsResponse, type Threat,
   type CorrectionAnalysis
 } from "../api";
@@ -234,6 +234,7 @@ function HealthPageContent() {
   // AI Corrector State
   const [aiCorrections, setAiCorrections] = useState<CorrectionAnalysis | null>(null);
   const [aiCorrectorLoading, setAiCorrectorLoading] = useState(false);
+  const [aiCorrectorError, setAiCorrectorError] = useState<string | null>(null);
   const [aiCorrectionsOpen, setAiCorrectionsOpen] = useState(false);
   const [selectedFixes, setSelectedFixes] = useState<Set<string>>(new Set());
 
@@ -248,20 +249,21 @@ function HealthPageContent() {
     }
   }, [searchParams]);
 
+  const refreshHealthData = useCallback(async (currentSessionId: string) => {
+    const profileData = await getProfile(currentSessionId);
+    setProfile(profileData);
+    const threatsData = await getThreats(currentSessionId);
+    setThreats(threatsData);
+  }, []);
+
   // Fetch profile and threats
   useEffect(() => {
     if (!sessionId) return;
-
     async function fetchData() {
       setLoading(true);
       setError(null);
       try {
-        const [profileData, threatsData] = await Promise.all([
-          getProfile(sessionId!),
-          getThreats(sessionId!),
-        ]);
-        setProfile(profileData);
-        setThreats(threatsData);
+        await refreshHealthData(sessionId!);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data. Is the backend running?");
       } finally {
@@ -269,7 +271,7 @@ function HealthPageContent() {
       }
     }
     fetchData();
-  }, [sessionId]);
+  }, [sessionId, refreshHealthData]);
 
   // Filter threats
   const filteredThreats = useMemo(() => {
@@ -285,15 +287,10 @@ function HealthPageContent() {
   const handleAutoClean = async () => {
     if (!sessionId) return;
     setIsAutoCleaning(true);
+    setError(null);
     try {
       await autoClean(sessionId);
-      // Re-fetch data
-      const [profileData, threatsData] = await Promise.all([
-        getProfile(sessionId),
-        getThreats(sessionId),
-      ]);
-      setProfile(profileData);
-      setThreats(threatsData);
+      await refreshHealthData(sessionId);
     } catch (err) {
       setError("Auto-clean failed: " + (err instanceof Error ? err.message : "Unknown error"));
     } finally {
@@ -305,11 +302,22 @@ function HealthPageContent() {
   const handleChat = async () => {
     if (!sessionId || !chatQuestion.trim()) return;
     setChatLoading(true);
+    setChatAnswer(null);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
       const res = await chatWithData(sessionId, chatQuestion);
+      clearTimeout(timeout);
       setChatAnswer(res.answer);
-    } catch {
-      setChatAnswer("Failed to get an answer. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("abort") || msg.includes("timeout")) {
+        setChatAnswer("Request timed out — Ollama may still be loading the model. Try again in a moment.");
+      } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        setChatAnswer("Cannot reach the backend. Make sure it's running on localhost:8000.");
+      } else {
+        setChatAnswer("Couldn't get an answer right now. If you're using Ollama, make sure it's running (`ollama serve`). Pattern-matched questions like 'what's missing?' work without Ollama.");
+      }
     } finally {
       setChatLoading(false);
     }
@@ -318,25 +326,39 @@ function HealthPageContent() {
   // AI Corrector handlers
   const handleAnalyze = async () => {
     if (!sessionId) return;
+    
+    // Automatically scroll to top so the user sees the panel expanding
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     setAiCorrectionsOpen(true);
     setAiCorrectorLoading(true);
+    setAiCorrectorError(null);
+    setAiCorrections(null);
     try {
+      const status = await getLLMStatus();
+      if (!status.available) {
+        setAiCorrectionsOpen(false);
+        setAiCorrectorError("Local AI engine offline. Please ensure Ollama is running (`ollama serve`) and the model (`qwen2.5:7b`) is pulled to enable intelligent scanning.");
+        return;
+      }
       const res = await analyzeCorrections(sessionId);
       setAiCorrections(res);
       // Auto-select all LLM suggestions by default
       const toSelect = new Set<string>();
-      res.category_merges.forEach((m, i) => toSelect.add(`merge_${i}`));
-      res.corrections.forEach((c, i) => toSelect.add(`corr_${i}`));
+      res.category_merges.forEach((m: any, i: number) => toSelect.add(`merge_${i}`));
+      res.corrections.forEach((c: any, i: number) => toSelect.add(`corr_${i}`));
       setSelectedFixes(toSelect);
     } catch (err) {
       console.error("Analysis failed:", err);
+      setAiCorrectionsOpen(false);
+      setAiCorrectorError(err instanceof Error ? err.message : "Correction scan failed. Check the backend and local Ollama service.");
     } finally {
       setAiCorrectorLoading(false);
     }
   };
 
   const handleApplyFixes = async () => {
-    if (!sessionId || !aiCorrections || selectedFixes.size === 0) return;
+    if (!sessionId || !aiCorrections) return;
     
     // Build list of approved corrections
     const approved: {column: string; old_value: string; new_value: string}[] = [];
@@ -355,6 +377,7 @@ function HealthPageContent() {
     
     setIsAutoCleaning(true); // Re-use loading state
     setAiCorrectionsOpen(false);
+    setError(null);
     try {
       // Apply the user-selected fixes
       if (approved.length > 0) {
@@ -364,13 +387,7 @@ function HealthPageContent() {
       // Then run auto-clean to fix the deterministic stuff (encoding, formats, type issues)
       await autoClean(sessionId);
       
-      // Re-fetch profile and threats
-      const [profileData, threatsData] = await Promise.all([
-        getProfile(sessionId),
-        getThreats(sessionId),
-      ]);
-      setProfile(profileData);
-      setThreats(threatsData);
+      await refreshHealthData(sessionId);
       setAiCorrections(null);
     } catch (err) {
       setError("Failed to apply AI fixes: " + (err instanceof Error ? err.message : "Unknown error"));
@@ -478,7 +495,7 @@ function HealthPageContent() {
           <div className="flex items-center gap-3">
             <button className="btn-ghost text-sm flex items-center gap-2" onClick={() => setChatOpen(!chatOpen)}>
               <MessageSquare size={16} />
-              Ask AI
+              Query Data
             </button>
             <a href="/upload" className="btn-ghost text-sm flex items-center gap-2">
               <ArrowLeft size={16} />
@@ -514,7 +531,7 @@ function HealthPageContent() {
             >
               <h3 className="font-display text-sm font-semibold mb-3 flex items-center gap-2">
                 <Brain size={16} className="text-[var(--accent)]" />
-                Ask Ollama-powered AI About Your Data
+                Data Query
               </h3>
               <div className="flex gap-2 mb-3">
                 <input
@@ -550,7 +567,7 @@ function HealthPageContent() {
             >
               <h3 className="font-display text-lg font-bold mb-4 flex items-center gap-2">
                 <Brain size={20} className="text-[var(--primary)]" />
-                Ollama AI Data Scanner
+                Pattern Scanner
                 {aiCorrectorLoading && <Loader2 size={16} className="animate-spin text-[var(--primary)] ml-2" />}
               </h3>
 
@@ -560,7 +577,7 @@ function HealthPageContent() {
                     <Activity size={32} className="text-[var(--primary)]" />
                     <motion.div className="absolute inset-0 border-2 border-[var(--primary)] rounded-full" animate={{ scale: [1, 1.5, 1], opacity: [1, 0, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
                   </div>
-                  <p className="text-sm text-[var(--text-secondary)]">Ollama is analyzing categories, checking types, and finding typos...</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Running local engine diagnostics and scanning correction candidates...</p>
                 </div>
               ) : aiCorrections ? (
                 <div className="space-y-6">
@@ -570,7 +587,7 @@ function HealthPageContent() {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-base font-bold flex items-center gap-2">
                           <Layers size={18} className="text-[var(--warning)]" />
-                          AI Category Merges ({aiCorrections.category_merges.length})
+                          Category Merges ({aiCorrections.category_merges.length})
                         </h4>
                         <button 
                           className="text-sm text-[var(--primary)] hover:underline font-bold bg-[rgba(99,102,241,0.1)] px-3 py-1 rounded-md"
@@ -598,8 +615,8 @@ function HealthPageContent() {
                               <input type="checkbox" className="w-5 h-5 accent-[var(--primary)] cursor-pointer" checked={selectedFixes.has(`merge_${i}`)} readOnly />
                             </div>
                             <div className="flex-1">
-                              <div className="text-base font-medium">Merge <span className="text-[var(--critical)] font-bold">"{merge.old_value}"</span> into <span className="text-[var(--success)] font-bold">"{merge.new_value}"</span></div>
-                              <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Ollama Reason:</span> {merge.reason}</div>
+                              <div className="text-base font-medium">Merge <span className="text-[var(--critical)] font-bold">&quot;{merge.old_value}&quot;</span> into <span className="text-[var(--success)] font-bold">&quot;{merge.new_value}&quot;</span></div>
+                              <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Reason:</span> {merge.reason}</div>
                             </div>
                           </div>
                         ))}
@@ -613,7 +630,7 @@ function HealthPageContent() {
                       <div className="flex items-center justify-between mb-3 mt-4">
                         <h4 className="text-base font-bold flex items-center gap-2">
                           <Zap size={18} className="text-[var(--accent)]" />
-                          AI Value Corrections ({aiCorrections.corrections.length})
+                          Value Corrections ({aiCorrections.corrections.length})
                         </h4>
                         <button 
                           className="text-sm text-[var(--primary)] hover:underline font-bold bg-[rgba(99,102,241,0.1)] px-3 py-1 rounded-md"
@@ -641,8 +658,8 @@ function HealthPageContent() {
                               <input type="checkbox" className="w-5 h-5 accent-[var(--primary)] cursor-pointer" checked={selectedFixes.has(`corr_${i}`)} readOnly />
                             </div>
                             <div className="flex-1">
-                              <div className="text-base font-medium">Fix <span className="text-[var(--critical)] font-bold">"{corr.old_value}"</span> → <span className="text-[var(--success)] font-bold">"{corr.new_value}"</span></div>
-                              <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Ollama Reason:</span> {corr.reason}</div>
+                              <div className="text-base font-medium">Fix <span className="text-[var(--critical)] font-bold">&quot;{corr.old_value}&quot;</span> → <span className="text-[var(--success)] font-bold">&quot;{corr.new_value}&quot;</span></div>
+                              <div className="text-sm text-[var(--text-secondary)] mt-2 p-2.5 rounded-lg bg-black/20 border border-white/5"><span className="text-[var(--primary)] font-bold">Reason:</span> {corr.reason}</div>
                             </div>
                           </div>
                         ))}
@@ -664,7 +681,7 @@ function HealthPageContent() {
 
                   {aiCorrections.category_merges.length === 0 && aiCorrections.corrections.length === 0 && (
                     <div className="text-center py-6 text-[var(--text-secondary)] text-sm">
-                      Ollama didn't find any categorical duplicates or typos to merge.
+                      No category merges or typo corrections were found. Type, encoding, numeric, and missing-value fixes can still be applied automatically.
                     </div>
                   )}
 
@@ -919,6 +936,38 @@ function HealthPageContent() {
           </div>
         </motion.div>
       </div>
+
+      {/* ═══ Error Modal ═══ */}
+      <AnimatePresence>
+        {aiCorrectorError && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="glass-card max-w-md w-full relative"
+              style={{ borderTop: "4px solid var(--critical)" }}
+            >
+              <div className="flex flex-col items-center text-center py-4">
+                <div className="w-16 h-16 rounded-full bg-[rgba(239,68,68,0.1)] flex items-center justify-center mb-4 text-[var(--critical)]">
+                  <AlertTriangle size={32} />
+                </div>
+                <h3 className="font-display text-xl font-bold mb-2">Engine Unavailable</h3>
+                <p className="text-[var(--text-secondary)] mb-6 text-sm px-2">
+                  {aiCorrectorError}
+                </p>
+                <button
+                  className="btn-primary w-full py-2.5 font-bold"
+                  style={{ background: "var(--critical)", color: "white", border: "none" }}
+                  onClick={() => setAiCorrectorError(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,8 +1,5 @@
-"""
-DataSoul Strategy Engine
-==========================
-Recommends preprocessing strategies (imputation, encoding, scaling,
-feature engineering) based on dataset profile and brain patterns.
+"""Recommends preprocessing strategies (imputation, encoding, scaling)
+based on column profiles and data characteristics.
 """
 
 import pandas as pd
@@ -29,21 +26,21 @@ class StrategyEngine:
                 "recommendations": [],
             }
 
-            # ─── Missing value strategy ───
+            # missing value strategy
             if missing_pct > 0:
                 strategy = self._missing_value_strategy(col, col_profile, df)
                 col_strategy["recommendations"].append(strategy)
                 if strategy.get("pipeline_step"):
                     pipeline_steps.append(strategy["pipeline_step"])
 
-            # ─── Encoding strategy ───
+            # encoding strategy
             if dtype == "object" and cardinality not in ("ID", "High"):
                 strategy = self._encoding_strategy(col, col_profile, df)
                 col_strategy["recommendations"].append(strategy)
                 if strategy.get("pipeline_step"):
                     pipeline_steps.append(strategy["pipeline_step"])
 
-            # ─── Scaling strategy ───
+            # scaling strategy
             if "float" in dtype or "int" in dtype:
                 if cardinality not in ("ID", "Binary"):
                     strategy = self._scaling_strategy(col, col_profile)
@@ -51,7 +48,7 @@ class StrategyEngine:
                     if strategy.get("pipeline_step"):
                         pipeline_steps.append(strategy["pipeline_step"])
 
-            # ─── Feature engineering ───
+            # feature engineering
             eng = self._feature_engineering(col, col_profile, df)
             if eng:
                 col_strategy["recommendations"].append(eng)

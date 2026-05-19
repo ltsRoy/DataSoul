@@ -1,12 +1,5 @@
-"""
-DataSoul Narrative Engine
-===========================
-Generates executive narratives, business insights, KPIs,
-and handles Conversational Data Chat Q&A.
-
-Dual-mode:
-1. LLM Mode — uses Ollama via llm_engine for rich, natural narratives
-2. Template Mode — deterministic fallback for instant responses
+"""Generates executive narratives, KPIs, and handles data chat.
+Uses Ollama when available, otherwise falls back to templates.
 """
 
 import pandas as pd
@@ -200,7 +193,7 @@ class NarrativeEngine:
         return "\n".join(sections)
 
     def answer_question(self, question: str, df: pd.DataFrame, profile: Optional[dict],
-                         rag_context: str = "") -> str:
+                         rag_context: str = "", threats: Optional[dict] = None) -> str:
         """Answer conversational questions about the dataset — LLM first, pattern-match fallback"""
         q = question.lower().strip()
 
@@ -260,6 +253,38 @@ class NarrativeEngine:
                     response += f"- **{col}:** {len(outliers)} outliers ({round(len(outliers)/len(clean)*100, 1)}%) | Range: [{round(float(q1 - 1.5*iqr), 2)}, {round(float(q3 + 1.5*iqr), 2)}]\n"
             return response if "**" in response else "No significant outliers detected in numeric columns."
 
+        if any(kw in q for kw in ["biggest threat", "main threat", "top threat", "fix first", "clean first", "priority", "what should i fix", "what to fix"]):
+            threat_list = (threats or {}).get("threats", [])
+            if not threat_list:
+                return "No active threats are currently detected. Your next best move is to export the cleaned dataset or ask for a summary of the strongest columns."
+
+            response = "## Highest Priority Fixes\n\n"
+            for i, threat in enumerate(threat_list[:3], 1):
+                actions = threat.get("actions", [])
+                response += f"{i}. **{threat.get('title', 'Data quality issue')}** ({threat.get('severity', 'unknown')})\n"
+                response += f"   Column: `{threat.get('column', 'N/A')}`\n"
+                response += f"   Why it matters: {threat.get('impact', 'This can affect analysis quality.')}\n"
+                if actions:
+                    response += f"   Best next action: {actions[0]}\n"
+            return response
+
+        if any(kw in q for kw in ["improve", "clean", "better", "raise", "increase"]) and any(kw in q for kw in ["score", "quality", "health", "data"]):
+            response = "## How to Improve the Data Health Score\n\n"
+            if profile and profile.get("quality_score", {}).get("dimensions"):
+                dims = profile["quality_score"]["dimensions"]
+                weakest = sorted(dims.items(), key=lambda item: item[1].get("score", 0))[:3]
+                for name, data in weakest:
+                    response += f"- **{name.title()}** is at {data.get('score', 0)}/100.\n"
+            threat_list = (threats or {}).get("threats", [])
+            if threat_list:
+                response += "\nTop actions:\n"
+                for threat in threat_list[:3]:
+                    action = threat.get("actions", ["Review this issue"])[0]
+                    response += f"- {action} for `{threat.get('column', 'N/A')}`.\n"
+            else:
+                response += "\nNo active threats remain; the remaining score gap is likely from conservative scoring dimensions such as recency or outliers."
+            return response
+
         if any(kw in q for kw in ["health", "quality", "score", "grade"]):
             if profile and "quality_score" in profile:
                 qs = profile["quality_score"]
@@ -283,22 +308,105 @@ class NarrativeEngine:
                     response += f"- **{col}:** mean={clean.mean():.2f}, median={clean.median():.2f}, range=[{clean.min():.2f}, {clean.max():.2f}]\n"
             return response
 
-        # Default response
-        return f"I can help you understand your dataset ({len(df):,} rows × {len(df.columns)} columns). Try asking:\n\n- \"What's missing in my data?\"\n- \"Are there duplicates?\"\n- \"Show me the data health score\"\n- \"What outliers exist?\"\n- \"Give me a summary\"\n- \"What's the biggest threat?\""
+        # -- smart fallback: try to answer from the data directly --
+
+        # check if the question references a column name
+        matched_col = None
+        for col in df.columns:
+            if col.lower() in q or col.lower().replace("_", " ") in q:
+                matched_col = col
+                break
+
+        if matched_col:
+            response = f"## Column: `{matched_col}`\n\n"
+            series = df[matched_col].dropna()
+            if pd.api.types.is_numeric_dtype(series):
+                response += f"- **Count:** {len(series):,}\n"
+                response += f"- **Mean:** {series.mean():.2f}\n"
+                response += f"- **Median:** {series.median():.2f}\n"
+                response += f"- **Std:** {series.std():.2f}\n"
+                response += f"- **Range:** [{series.min():.2f}, {series.max():.2f}]\n"
+                response += f"- **Missing:** {int(df[matched_col].isna().sum())} ({round(df[matched_col].isna().mean()*100, 1)}%)\n"
+            else:
+                unique = series.nunique()
+                response += f"- **Unique values:** {unique}\n"
+                response += f"- **Missing:** {int(df[matched_col].isna().sum())} ({round(df[matched_col].isna().mean()*100, 1)}%)\n"
+                if unique <= 30:
+                    response += f"\n**Value counts:**\n\n| Value | Count |\n|-------|-------|\n"
+                    for val, cnt in series.value_counts().head(10).items():
+                        response += f"| {val} | {cnt:,} |\n"
+            return response
+
+        # check for top/best/highest/most type questions — try numeric aggregation
+        if any(kw in q for kw in ["top", "best", "highest", "most", "largest", "biggest", "max", "popular"]):
+            cat_cols = df.select_dtypes(include=["object"]).columns
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            if len(cat_cols) > 0 and len(num_cols) > 0:
+                cat_col = cat_cols[0]
+                num_col = num_cols[-1]  # usually amount/total is last
+                for c in num_cols:
+                    if any(kw in c.lower() for kw in ["total", "amount", "revenue", "sales", "price"]):
+                        num_col = c
+                        break
+                grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=False).head(10)
+                response = f"## Top {cat_col} by {num_col}\n\n"
+                response += f"| {cat_col} | {num_col} |\n|---|---|\n"
+                for val, total in grouped.items():
+                    response += f"| {val} | {self._format_currency(float(total))} |\n"
+                return response
+
+        # check for bottom/worst/lowest type questions
+        if any(kw in q for kw in ["bottom", "worst", "lowest", "least", "smallest", "min"]):
+            cat_cols = df.select_dtypes(include=["object"]).columns
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            if len(cat_cols) > 0 and len(num_cols) > 0:
+                cat_col = cat_cols[0]
+                num_col = num_cols[-1]
+                for c in num_cols:
+                    if any(kw in c.lower() for kw in ["total", "amount", "revenue", "sales", "price"]):
+                        num_col = c
+                        break
+                grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=True).head(10)
+                response = f"## Bottom {cat_col} by {num_col}\n\n"
+                response += f"| {cat_col} | {num_col} |\n|---|---|\n"
+                for val, total in grouped.items():
+                    response += f"| {val} | {self._format_currency(float(total))} |\n"
+                return response
+
+        # check for correlation/relationship questions
+        if any(kw in q for kw in ["correlat", "relat", "affect", "impact", "connect"]):
+            num_cols = df.select_dtypes(include=[np.number]).columns
+            if len(num_cols) >= 2:
+                corr = df[num_cols].corr()
+                pairs = []
+                for i, c1 in enumerate(num_cols):
+                    for c2 in num_cols[i+1:]:
+                        r = corr.loc[c1, c2]
+                        if abs(r) > 0.3:
+                            pairs.append((c1, c2, r))
+                pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+                if pairs:
+                    response = "## Notable Correlations\n\n| Column A | Column B | Correlation |\n|---|---|---|\n"
+                    for c1, c2, r in pairs[:8]:
+                        strength = "Strong" if abs(r) > 0.7 else "Moderate"
+                        direction = "positive" if r > 0 else "negative"
+                        response += f"| {c1} | {c2} | {r:.2f} ({strength} {direction}) |\n"
+                    return response
+
+        # final fallback — but tell the user what happened
+        llm_note = ""
+        if not self._llm.is_available:
+            llm_note = "\n\n> **Note:** Ollama is not running, so I can only answer pattern-matched questions. Start Ollama (`ollama serve`) for open-ended AI answers.\n"
+
+        return f"I analyzed your dataset ({len(df):,} rows × {len(df.columns)} columns) but couldn't find a specific answer for \"{question[:80]}\".{llm_note}\n\nTry asking:\n- \"What's missing in my data?\"\n- \"Are there duplicates?\"\n- \"Show me the data health score\"\n- \"What outliers exist?\"\n- \"Give me a summary\"\n- \"What's the biggest threat?\"\n- Or reference a column name directly, e.g. \"tell me about {df.columns[0]}\""
 
     @staticmethod
     def _is_simple_question(q: str) -> bool:
         """Check if a question matches our simple pattern-match templates.
         If so, we skip the LLM for faster response."""
-        simple_patterns = [
-            ["missing", "null", "empty", "na"],
-            ["duplicate", "dup"],
-            ["shape", "size", "how many", "rows", "columns"],
-            ["outlier", "extreme", "anomal"],
-            ["health", "quality", "score", "grade"],
-            ["summary", "overview", "describe", "tell me about"],
-        ]
-        return any(any(kw in q for kw in group) for group in simple_patterns)
+        # Overridden to prevent overly restrictive pattern matching 
+        # from blocking LLM engagement for user inquiries.
+        return False
 
     @staticmethod
     def _format_currency(value: float) -> str:
