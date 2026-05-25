@@ -101,5 +101,11 @@ def _auto_register():
     except Exception:
         pass
 
+    try:
+        from .mcp_connector import MCPIntegration
+        register(MCPIntegration())
+    except Exception:
+        pass
+
 
 _auto_register()

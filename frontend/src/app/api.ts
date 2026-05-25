@@ -943,3 +943,103 @@ export async function importFromDataGovIn(
     body: JSON.stringify({ resource_id: resourceId, api_key: apiKey, limit }),
   });
 }
+
+/* ═══════════════════════════════════════════
+   MCP SERVER INTEGRATION METHODS
+   ═══════════════════════════════════════════ */
+
+export interface AwesomeMCPServer {
+  name: string;
+  repo: string;
+  description: string;
+  category: string;
+  language: string;
+  scope: string;
+  os: string[];
+  templates?: {
+    stdio?: { command: string; args: string[] };
+    sse?: { url: string };
+  };
+}
+
+export interface MCPConnectionResponse {
+  status: string;
+  connection_id: string;
+  server_info: { name?: string; version?: string };
+  capabilities: Record<string, any>;
+  logs: string[];
+}
+
+export interface MCPDiscoveryDetails {
+  connection_id: string;
+  tools: { name: string; description?: string; inputSchema: Record<string, any> }[];
+  resources: { uri: string; name: string; description?: string; mimeType?: string }[];
+}
+
+/** Get list of awesome MCP servers */
+export async function getAwesomeMCPServers(): Promise<{ servers: AwesomeMCPServer[] }> {
+  return apiFetch<{ servers: AwesomeMCPServer[] }>("/api/mcp/awesome");
+}
+
+/** Connect to an MCP server */
+export async function connectMCPServer(config: {
+  transport: "stdio" | "sse";
+  command?: string;
+  args?: string[];
+  url?: string;
+}): Promise<MCPConnectionResponse> {
+  return apiFetch<MCPConnectionResponse>("/api/mcp/connect", {
+    method: "POST",
+    body: JSON.stringify(config),
+  });
+}
+
+/** Discover status and logs of connected MCP server */
+export async function discoverMCPServer(connectionId: string): Promise<MCPConnectionResponse> {
+  return apiFetch<MCPConnectionResponse>(`/api/mcp/discover/${connectionId}`);
+}
+
+/** Fetch tools and resources for an active MCP server */
+export async function discoverMCPServerDetails(connectionId: string): Promise<MCPDiscoveryDetails> {
+  return apiFetch<MCPDiscoveryDetails>(`/api/mcp/discover/${connectionId}/details`);
+}
+
+/** Call an MCP tool */
+export async function callMCPTool(
+  connectionId: string,
+  name: string,
+  argumentsVal: Record<string, any>
+): Promise<any> {
+  return apiFetch<any>(`/api/mcp/call-tool/${connectionId}`, {
+    method: "POST",
+    body: JSON.stringify({ name, arguments: argumentsVal }),
+  });
+}
+
+/** Read an MCP resource */
+export async function readMCPResource(connectionId: string, uri: string): Promise<any> {
+  return apiFetch<any>(`/api/mcp/read-resource/${connectionId}`, {
+    method: "POST",
+    body: JSON.stringify({ uri }),
+  });
+}
+
+/** Disconnect from an MCP server */
+export async function disconnectMCPServer(connectionId: string): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>(`/api/mcp/disconnect/${connectionId}`, {
+    method: "POST",
+  });
+}
+
+/** Import data retrieved from an MCP server as a new DataSoul dataset session */
+export async function importFromMCP(
+  connectionId: string,
+  sourceName: string,
+  content: any
+): Promise<UploadResponse> {
+  return apiFetch<UploadResponse>("/api/import/mcp", {
+    method: "POST",
+    body: JSON.stringify({ connection_id: connectionId, source_name: sourceName, content }),
+  });
+}
+

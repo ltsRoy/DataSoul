@@ -1,0 +1,212 @@
+[
+  {
+    "name": "a2asearch-mcp",
+    "repo": "tadas-github/a2asearch-mcp",
+    "description": "Search 4,800+ MCP servers, AI agents, CLI tools and skills. Free, no auth required.",
+    "category": "Aggregators & Search",
+    "language": "TypeScript",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "a2asearch-mcp"]
+      }
+    }
+  },
+  {
+    "name": "sqlite-mcp-server",
+    "repo": "modelcontextprotocol/server-sqlite",
+    "description": "Official SQLite database connector. Allows querying, schema inspection, and data loading from local SQLite databases.",
+    "category": "Databases & Storage",
+    "language": "TypeScript",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db", "./data.db"]
+      }
+    }
+  },
+  {
+    "name": "postgres-mcp-server",
+    "repo": "modelcontextprotocol/server-postgres",
+    "description": "Official PostgreSQL database connector. Inspect tables, schema info, and run safe queries.",
+    "category": "Databases & Storage",
+    "language": "TypeScript",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://username:password@localhost:5432/database"]
+      }
+    }
+  },
+  {
+    "name": "playwright-mcp",
+    "repo": "microsoft/playwright-mcp",
+    "description": "Official Playwright browser automation MCP server. Automate browser sessions, take screenshots, scrape web pages and retrieve accessibility trees.",
+    "category": "Browser Automation",
+    "language": "TypeScript",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-playwright"]
+      }
+    }
+  },
+  {
+    "name": "anyquery",
+    "repo": "julien040/anyquery",
+    "description": "Query more than 40 apps (Google Sheets, Notion, GitHub, Shopify) using SQL. Private and local-first by design.",
+    "category": "Databases & Storage",
+    "language": "Go",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "anyquery",
+        "args": ["mcp"]
+      }
+    }
+  },
+  {
+    "name": "photopea-mcp-server",
+    "repo": "attalla1/photopea-mcp-server",
+    "description": "AI-powered image editing through Photopea with 34 tools for layers, text, shapes, filters, and formats.",
+    "category": "Art, Design & Visuals",
+    "language": "TypeScript",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "photopea-mcp-server"]
+      }
+    }
+  },
+  {
+    "name": "spotify-mcp",
+    "repo": "gupta-kush/spotify-mcp",
+    "description": "Spotify integration: search catalog, browse library, perform vibe analysis, manage playlists and shuffle tracks.",
+    "category": "Art, Design & Visuals",
+    "language": "Python",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "uvx",
+        "args": ["spotify-mcp"]
+      }
+    }
+  },
+  {
+    "name": "excalidraw-architect-mcp",
+    "repo": "BV-Venky/excalidraw-architect-mcp",
+    "description": "Generate beautiful Excalidraw architecture diagrams with auto-layout and tech mappings (databases, caches, queues).",
+    "category": "Art, Design & Visuals",
+    "language": "Python",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "uvx",
+        "args": ["excalidraw-architect-mcp"]
+      }
+    }
+  },
+  {
+    "name": "tentra-mcp",
+    "repo": "rdanieli/tentra-mcp",
+    "description": "AI-native cloud architecture diagrams supporting 14 target codebases and structured quality linting.",
+    "category": "Art, Design & Visuals",
+    "language": "TypeScript",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "tentra-mcp", "--local", "init"]
+      }
+    }
+  },
+  {
+    "name": "mymedi-ai-mcp-server",
+    "repo": "MyMedi-AI/mymedi-ai-mcp-server",
+    "description": "Healthcare billing AI: ICD-10/CPT code lookups, claims validation, prior auth, denial prediction.",
+    "category": "Research & Bioinformatics",
+    "language": "TypeScript",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@mymedi-ai/mcp-server"]
+      }
+    }
+  },
+  {
+    "name": "ucsc-genome-mcp",
+    "repo": "hlydecker/ucsc-genome-mcp",
+    "description": "UCSC Genome Browser integration for finding genomes, chromosomes, gene boundaries, and genomic records.",
+    "category": "Research & Bioinformatics",
+    "language": "Python",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "uvx",
+        "args": ["ucsc-genome-mcp"]
+      }
+    }
+  },
+  {
+    "name": "agentfetch-mcp",
+    "repo": "bch1212/agentfetch-mcp",
+    "description": "Token-budgeted web fetch. Clean markdown retrieval with auto-routing, Trafilatura, Jina, and PDF support.",
+    "category": "Browser Automation",
+    "language": "Python",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "uvx",
+        "args": ["agentfetch-mcp"]
+      }
+    }
+  },
+  {
+    "name": "git-mcp-server",
+    "repo": "modelcontextprotocol/server-git",
+    "description": "Official Git integration. Allows inspecting repositories, listing files, checking diffs, and committing changes.",
+    "category": "Code & Developer Tools",
+    "language": "TypeScript",
+    "scope": "Local",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-git"]
+      }
+    }
+  },
+  {
+    "name": "github-mcp-server",
+    "repo": "modelcontextprotocol/server-github",
+    "description": "Official GitHub API integration. Search repositories, create issues, review pull requests, and manage contents.",
+    "category": "Code & Developer Tools",
+    "language": "TypeScript",
+    "scope": "Cloud",
+    "os": ["macOS", "Windows", "Linux"],
+    "templates": {
+      "stdio": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"]
+      }
+    }
+  }
+]

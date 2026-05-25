@@ -877,10 +877,192 @@ def download_file(filename: str):
 def get_integrations():
     """List all available integrations and their auth status"""
     return {"integrations": list_integrations()}
+# --- MCP (Model Context Protocol) endpoints ---
+
+@app.get("/api/mcp/awesome")
+def get_awesome_mcp_servers():
+    """Get the curated list of awesome MCP servers."""
+    json_path = Path(__file__).parent / "integrations" / "awesome_mcp_servers.json"
+    if not json_path.exists():
+        return {"servers": []}
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return {"servers": json.load(f)}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to load awesome servers: {e}")
+
+
+@app.post("/api/mcp/connect")
+async def connect_mcp_server(body: dict):
+    """Initiate connection to an MCP server (stdio or sse)."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    try:
+        conn_id = await integration.connect_client(body)
+        client = integration.get_client(conn_id)
+        if not client:
+            raise HTTPException(500, "Failed to register connection client")
+            
+        return {
+            "status": "success",
+            "connection_id": conn_id,
+            "server_info": client.server_info,
+            "capabilities": client.capabilities,
+            "logs": client.logs
+        }
+    except Exception as e:
+        raise HTTPException(400, f"Connection failed: {str(e)}")
+
+
+@app.get("/api/mcp/discover/{connection_id}")
+def discover_mcp_server(connection_id: str):
+    """Retrieve logs, tools, and resources for an active MCP server."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    client = integration.get_client(connection_id)
+    if not client:
+        raise HTTPException(404, f"No active connection found for ID: {connection_id}")
+        
+    return {
+        "connection_id": connection_id,
+        "is_connected": client.is_connected,
+        "server_info": client.server_info,
+        "capabilities": client.capabilities,
+        "logs": client.logs
+    }
+
+
+@app.get("/api/mcp/discover/{connection_id}/details")
+async def discover_mcp_server_details(connection_id: str):
+    """Fetch lists of tools and resources exposed by the server."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    client = integration.get_client(connection_id)
+    if not client:
+        raise HTTPException(404, f"No active connection found for ID: {connection_id}")
+        
+    try:
+        tools = []
+        resources = []
+        
+        # Check capabilities
+        if client.capabilities.get("tools"):
+            tools = await client.list_tools()
+        if client.capabilities.get("resources"):
+            resources = await client.list_resources()
+            
+        return {
+            "connection_id": connection_id,
+            "tools": tools,
+            "resources": resources
+        }
+    except Exception as e:
+        raise HTTPException(400, f"Discovery failed: {str(e)}")
+
+
+@app.post("/api/mcp/call-tool/{connection_id}")
+async def call_mcp_tool(connection_id: str, body: dict):
+    """Call a specific tool on the connected server."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    client = integration.get_client(connection_id)
+    if not client:
+        raise HTTPException(404, f"No active connection found for ID: {connection_id}")
+        
+    name = body.get("name", "")
+    arguments = body.get("arguments", {})
+    if not name:
+        raise HTTPException(400, "tool 'name' is required")
+        
+    try:
+        res = await client.call_tool(name, arguments)
+        return res
+    except Exception as e:
+        raise HTTPException(400, f"Tool execution failed: {str(e)}")
+
+
+@app.post("/api/mcp/read-resource/{connection_id}")
+async def read_mcp_resource(connection_id: str, body: dict):
+    """Read a specific resource from the connected server."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    client = integration.get_client(connection_id)
+    if not client:
+        raise HTTPException(404, f"No active connection found for ID: {connection_id}")
+        
+    uri = body.get("uri", "")
+    if not uri:
+        raise HTTPException(400, "resource 'uri' is required")
+        
+    try:
+        res = await client.read_resource(uri)
+        return res
+    except Exception as e:
+        raise HTTPException(400, f"Resource read failed: {str(e)}")
+
+
+@app.post("/api/mcp/disconnect/{connection_id}")
+async def disconnect_mcp_server(connection_id: str):
+    """Cleanly close an MCP connection."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    await integration.disconnect_client(connection_id)
+    return {"status": "success", "message": f"Connection {connection_id} terminated"}
+
+
+@app.post("/api/import/mcp")
+def import_mcp_data(body: dict):
+    """Import dataset generated from MCP tool calls or resource reads."""
+    integration = get_integration("mcp")
+    if not integration:
+        raise HTTPException(503, "MCP integration not available")
+        
+    content = body.get("content", "")
+    source_name = body.get("source_name", "mcp_import")
+    
+    if not content:
+        raise HTTPException(400, "No content provided to import")
+        
+    try:
+        df = integration.import_data(source_name, content=content)
+    except Exception as e:
+        raise HTTPException(400, f"Import parser failed: {e}")
+        
+    session_id = str(uuid.uuid4())[:8]
+    sessions[session_id] = {
+        "filename": f"mcp_{source_name[:20]}.csv",
+        "file_path": "mcp",
+        "df": df,
+        "original_shape": df.shape,
+        "audit_trail": [],
+        "iteration_count": 0,
+        "source": "mcp",
+    }
+    
+    return {
+        "session_id": session_id,
+        "filename": f"MCP Import ({source_name})",
+        "rows": df.shape[0],
+        "cols": df.shape[1],
+        "columns": list(df.columns)
+    }
 
 
 @app.post("/api/import/google-sheets")
 def import_google_sheets(body: dict):
+
     """Import dataset from a Google Sheet URL"""
     integration = get_integration("google_sheets")
     if not integration:
