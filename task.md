@@ -28,4 +28,4 @@
 ## Verification
 - [x] Run Python syntax/import checks for backend changes.
 - [x] Run frontend TypeScript checks where practical.
-- [ ] Smoke-check the health page UI after frontend changes.
+- [x] Smoke-check the health page UI after frontend changes.
